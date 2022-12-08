@@ -13,15 +13,46 @@ namespace ACadSharp.Examples
 		const string file = "../../../../samples/sample_AC1021.dwg";
 
 		static void Main(string[] args)
-		{
-			CadDocument doc;
-			using (DwgReader reader = new DwgReader(file))
-			{
-				doc = reader.Read();
-			}
+        {
+            using var dwgReader = new DwgReader("../../../../samples/angle.dwg");
+            var dwgDoc = dwgReader.Read();
 
-			ExploreDocument(doc);
-		}
+            using var dxfReader = new DxfReader("../../../../samples/angle.dxf");
+            var dxfDoc = dxfReader.Read();
+
+            var dxfEntities = dxfDoc.Entities.ToArray();
+            var dwgEntities = dwgDoc.Entities.ToArray();
+
+            for (int i = 0; i < dxfEntities.Length; i++)
+            {
+                if (dxfEntities[i] is Ellipse)
+                {
+					Console.WriteLine($"DXF Ellipse StartParameter: {((Ellipse)dxfEntities[i]).StartParameter}");
+					Console.WriteLine($"DWG Ellipse StartParameter: {((Ellipse)dwgEntities[i]).StartParameter}");
+                    Console.WriteLine($"DXF Ellipse StartParameter: {((Ellipse)dxfEntities[i]).EndParameter}");
+					Console.WriteLine($"DWG Ellipse StartParameter: {((Ellipse)dwgEntities[i]).EndParameter}");
+                }
+                else if (dxfEntities[i] is MText)
+                {
+                    Console.WriteLine($"DXF MText Rotation: {((MText)dxfEntities[i]).Rotation}");
+                    Console.WriteLine($"DWG MText Rotation: {((MText)dwgEntities[i]).Rotation}");
+                }
+                else if (dxfEntities[i] is TextEntity)
+                {
+                    Console.WriteLine($"DXF TextEntity Rotation: {((TextEntity)dxfEntities[i]).Rotation}");
+                    Console.WriteLine($"DWG TextEntity Rotation: {((TextEntity)dwgEntities[i]).Rotation}");
+                }
+                else if (dxfEntities[i] is Arc)
+                {
+                    Console.WriteLine($"DXF Arc StartAngle: {((Arc)dxfEntities[i]).StartAngle}");
+                    Console.WriteLine($"DWG Arc StartAngle: {((Arc)dwgEntities[i]).StartAngle}"); 
+                    Console.WriteLine($"DXF Arc EndAngle: {((Arc)dxfEntities[i]).EndAngle}");
+                    Console.WriteLine($"DWG Arc EndAngle: {((Arc)dwgEntities[i]).EndAngle}");
+                }
+            }
+
+            Console.ReadLine();
+        }
 
 		/// <summary>
 		/// Logs in the console the document information
