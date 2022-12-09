@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using Xunit;
 using Xunit.Abstractions;
+using static System.Environment;
 
 namespace ACadSharp.Tests.IO
 {
@@ -22,6 +23,7 @@ namespace ACadSharp.Tests.IO
 		public static TheoryData<string> DxfBinaryFiles { get; }
 
 		public static TheoryData<ACadVersion> Versions { get; }
+		public static string AcCoreConsolePath { get; }
 
 		protected readonly ITestOutputHelper _output;
 
@@ -58,7 +60,43 @@ namespace ACadSharp.Tests.IO
 			{
 				Directory.CreateDirectory(_samplesOutFolder);
 			}
-		}
+
+
+            var acCoreConsolePath = @"D:\Programs\Autodesk\AutoCAD 2023\accoreconsole.exe";
+
+            if (!File.Exists(acCoreConsolePath))
+            {
+                var programFiles = Environment.GetFolderPath(SpecialFolder.ProgramFiles);
+                var autocadPath = Path.Combine(programFiles, "Autodesk");
+
+                //"C:\\Program Files\\Autodesk\\AutoCAD LT 2021"
+
+                var baseAutoCadPaths = new string[]
+                {
+                    "AutoCAD 2023",
+                    "AutoCAD LT 2023",
+                    "AutoCAD 2022",
+                    "AutoCAD LT 2022",
+                    "AutoCAD 2021",
+                    "AutoCAD LT 2021",
+                };
+
+                for (int i = 0; i < baseAutoCadPaths.Length; i++)
+                {
+                    var consolePath = Path.Combine(autocadPath, baseAutoCadPaths[i], "accoreconsole.exe");
+                    if (File.Exists(consolePath))
+                    {
+                        AcCoreConsolePath = consolePath;
+                        break;
+                    }
+                }
+            }
+
+            else
+            {
+                AcCoreConsolePath = acCoreConsolePath;
+            }
+        }
 
 		public IOTestsBase(ITestOutputHelper output)
 		{
@@ -78,10 +116,15 @@ namespace ACadSharp.Tests.IO
 
 			System.Diagnostics.Process process = new System.Diagnostics.Process();
 
-			try
+
+
+
+
+
+            try
 			{
 				process.StartInfo.WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden;
-				process.StartInfo.FileName = "\"D:\\Programs\\Autodesk\\AutoCAD 2023\\accoreconsole.exe\"";
+				process.StartInfo.FileName = AcCoreConsolePath;
 				process.StartInfo.Arguments = $"/i \"{Path.Combine(_samplesFolder, "sample_base/empty.dwg")}\" /l en - US";
 				process.StartInfo.UseShellExecute = false;
 				process.StartInfo.RedirectStandardOutput = true;
