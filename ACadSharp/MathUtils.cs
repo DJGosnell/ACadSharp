@@ -36,5 +36,26 @@ namespace ACadSharp
 			//Needs a plane of reference in case is in 3D
 			throw new NotImplementedException();
 		}
-	}
+
+
+        /// <summary>
+        /// Gets a vector between origin vector (1, 0, 0)
+        /// </summary>
+        /// <param name="vector">Vector to calculate the angle from.</param>
+        /// <returns>Angle in radians.</returns>
+        public static double GetAngleFromOriginVector(XYZ vector)
+        {
+            return Math.Atan2(vector.Y, vector.X);
+        }
+
+        /// <summary>
+        /// Calculates a normalized vector from an angle (in radians)
+        /// </summary>
+        /// <param name="angle">Angle in radians.</param>
+        /// <returns>Normalized directional vector in 2d.</returns>
+        public static XYZ GetOriginVectorFromAngle(double angle)
+        {
+            return new XYZ(Math.Cos(angle), Math.Sin(angle), 0);
+        }
+    }
 }
