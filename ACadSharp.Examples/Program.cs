@@ -5,6 +5,8 @@ using ACadSharp.Tables;
 using ACadSharp.Tables.Collections;
 using System;
 using System.Linq;
+using System.Numerics;
+using CSMath;
 
 namespace ACadSharp.Examples
 {
@@ -23,6 +25,14 @@ namespace ACadSharp.Examples
             var dxfEntities = dxfDoc.Entities.ToArray();
             var dwgEntities = dwgDoc.Entities.ToArray();
 
+
+            double AngleBetween(XYZ vector1, XYZ vector2)
+            {
+                return Math.Atan2(
+                    vector1.X * vector2.Y - vector2.X * vector1.Y, 
+                    vector1.X * vector2.X + vector1.Y * vector2.Y);
+            }
+
             for (int i = 0; i < dxfEntities.Length; i++)
             {
                 if (dxfEntities[i] is Ellipse)
@@ -36,17 +46,30 @@ namespace ACadSharp.Examples
                 {
                     Console.WriteLine($"DXF MText Rotation: {((MText)dxfEntities[i]).Rotation}");
                     Console.WriteLine($"DWG MText Rotation: {((MText)dwgEntities[i]).Rotation}");
+
+                    var dwg = (MText)dwgEntities[i];
+                    var dxf = (MText)dxfEntities[i];
+
+                    var angleDwg = AngleBetween(new XYZ(1,0,0), dwg.AlignmentPoint);
+                    var angleDxf = AngleBetween(new XYZ(1, 0, 0), dxf.AlignmentPoint);
+
+
+                    Console.WriteLine($"DWG MText Rotation Calculated: {angleDwg}");
+                    Console.WriteLine($"DWG MText Rotation Calculated: {angleDxf}");
                 }
                 else if (dxfEntities[i] is TextEntity)
                 {
                     Console.WriteLine($"DXF TextEntity Rotation: {((TextEntity)dxfEntities[i]).Rotation}");
+                    Console.WriteLine($"DXF TextEntity Rotation Converted: {((TextEntity)dxfEntities[i]).Rotation * (Math.PI / 180)}");
                     Console.WriteLine($"DWG TextEntity Rotation: {((TextEntity)dwgEntities[i]).Rotation}");
                 }
                 else if (dxfEntities[i] is Arc)
                 {
                     Console.WriteLine($"DXF Arc StartAngle: {((Arc)dxfEntities[i]).StartAngle}");
+                    Console.WriteLine($"DXF Arc StartAngle Converted: {((Arc)dxfEntities[i]).StartAngle * (Math.PI / 180)}");
                     Console.WriteLine($"DWG Arc StartAngle: {((Arc)dwgEntities[i]).StartAngle}"); 
                     Console.WriteLine($"DXF Arc EndAngle: {((Arc)dxfEntities[i]).EndAngle}");
+                    Console.WriteLine($"DXF Arc EndAngle Converted: {((Arc)dxfEntities[i]).EndAngle * (Math.PI / 180)}");
                     Console.WriteLine($"DWG Arc EndAngle: {((Arc)dwgEntities[i]).EndAngle}");
                 }
             }
