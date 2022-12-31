@@ -8,7 +8,7 @@ namespace ACadSharp.Entities
     public partial class MText
     {
         /// <summary>
-        /// Reader to parse AutoCAD M-Text value entries and return tokens.
+        /// Zero copy reader to parse AutoCAD M-Text value entries and return tokens.
         /// </summary>
         /// <remarks>
         /// Main goal of this reader is to be a zero copy reader.
@@ -25,14 +25,17 @@ namespace ACadSharp.Entities
             private int _position = 0;
             private int _textValueStart = -1;
             private int _textValueEnd;
+            private MText.TokenValue _flushTokenValue = new TokenValue();
+            private MText.TokenFraction _flushFractionValue = new TokenFraction();
 
             private readonly Stack<MText.Format> _fontStateStack = new Stack<MText.Format>(4);
+            private readonly Stack<MText.Format> _freeFormatStates = new Stack<MText.Format>(4);
             private MText.Format _currentFormat;
 
-            private readonly List<ReadOnlyMemory<char>> _flushChunks = new List<ReadOnlyMemory<char>>(8);
-            private Action<MTextToken> _visitor;
+            private readonly List<ReadOnlyMemory<char>> _mainBuffer = new List<ReadOnlyMemory<char>>(8);
+            private readonly List<ReadOnlyMemory<char>> _secondBuffer = new List<ReadOnlyMemory<char>>(8);
+            private Action<Token> _visitor;
             private bool _controlCode;
-            private readonly List<ReadOnlyMemory<char>> _tempSlices = new List<ReadOnlyMemory<char>>(8);
 
             private readonly Memory<char> _charBuffer = new Memory<char>(new char[1]);
 
@@ -42,7 +45,7 @@ namespace ACadSharp.Entities
             /// <param name="content">Content to parse.</param>
             /// <returns>Parsed token list.  This is not a zero copy parsing process.</returns>
             /// <remarks>Not thread safe.</remarks>
-            public MTextToken[] Parse(string content)
+            public Token[] Parse(string content)
             {
                 return Parse(content.AsMemory());
             }
@@ -53,21 +56,32 @@ namespace ACadSharp.Entities
             /// <param name="content">Content to parse.</param>
             /// <returns>Parsed token list.  This is not a zero copy parsing process.</returns>
             /// <remarks>Not thread safe.</remarks>
-            public MTextToken[] Parse(ReadOnlyMemory<char> content)
+            public Token[] Parse(ReadOnlyMemory<char> content)
             {
-                var list = new List<MTextToken>();
+                var list = new List<Token>();
                 Walk(token =>
                 {
-                    token.Format = new Format(token.Format);
-
                     // Copy the values if we are not using the values when walking since the memory will change
                     // throughout the iteration.
                     if (token is MText.TokenValue value)
                     {
-                        value.Values = new[] { value.CombinedValues.AsMemory() };
+                        list.Add(new TokenValue()
+                        {
+                            Format = new Format(value.Format), 
+                            Values = new[] { value.CombinedValues.AsMemory() }
+                        });
+                    }
+                    else if (token is MText.TokenFraction fraction)
+                    {
+                        list.Add(new TokenFraction()
+                        {
+                            Format = new Format(fraction.Format),
+                            Denominator = new[] { fraction.DenominatorCombined.AsMemory() },
+                            Numerator = new[] { fraction.NumeratorCombined.AsMemory() },
+                            DividerType = fraction.DividerType
+                        });
                     }
 
-                    list.Add(token);
                 }, content);
 
                 return list.ToArray();
@@ -84,15 +98,16 @@ namespace ACadSharp.Entities
             /// are not guaranteed to be valid beyond the return of the visitor.
             /// Not Thread Safe.
             /// </remarks>
-            public bool Walk(Action<MTextToken> visitor, ReadOnlyMemory<char> content)
+            public bool Walk(Action<Token> visitor, ReadOnlyMemory<char> content)
             {
                 _content = content;
                 _visitor = visitor;
-                _currentFormat = new MText.Format();
                 _textValueStart = -1;
                 _textValueEnd = -1;
                 _length = _content.Length;
                 _controlCode = false;
+                _position = 0;
+                setNewCurrentFormat();
 
                 var spanText = _content.Span;
                 var charBufferSpan = _charBuffer.Span;
@@ -102,7 +117,7 @@ namespace ACadSharp.Entities
                     if (token == '\\')
                     {
                         if (_controlCode)
-                            _flushChunks.Add(_content.Slice(_position, 1));
+                            _mainBuffer.Add(_content.Slice(_position, 1));
 
                         _controlCode = !_controlCode;
                     }
@@ -187,7 +202,7 @@ namespace ACadSharp.Entities
                     {
                         _controlCode = false;
                         flushText();
-                        if (!tryParseFraction(spanText, out var fractionToken))
+                        if (!tryParseFraction(spanText))
                             return false;
                     }
                     else if (_controlCode && token == 'L')
@@ -236,7 +251,7 @@ namespace ACadSharp.Entities
                     {
                         _controlCode = false;
                         charBufferSpan[0] = '\n';
-                        _flushChunks.Add(_charBuffer);
+                        _mainBuffer.Add(_charBuffer);
                         flushText();
                     }  
                     else if (_controlCode && token == '~')
@@ -244,18 +259,21 @@ namespace ACadSharp.Entities
                         // Non Breaking Space
                         _controlCode = false;
                         charBufferSpan[0] = '\u00A0';
-                        _flushChunks.Add(_charBuffer);
+                        _mainBuffer.Add(_charBuffer);
                         flushText();
                     }
                     else if (!_controlCode && token == '{')
                     {
                         flushText();
                         _fontStateStack.Push(_currentFormat);
-                        _currentFormat = new MText.Format(_currentFormat);
+                        setNewCurrentFormat();
+
                     }
                     else if (!_controlCode && token == '}')
                     {
                         flushText();
+                        _currentFormat.Reset();
+                        _freeFormatStates.Push(_currentFormat);
                         _currentFormat = _fontStateStack.Pop();
                     }
                     else
@@ -270,13 +288,31 @@ namespace ACadSharp.Entities
                         if (_controlCode)
                         {
                             charBufferSpan[0] = '\\';
-                            _flushChunks.Add(_charBuffer);
+                            _mainBuffer.Add(_charBuffer);
                         }
 
                         flushText();
+                        _currentFormat.Reset();
+                        _freeFormatStates.Push(_currentFormat);
                         return true;
                     }
 
+                }
+            }
+
+            private void setNewCurrentFormat()
+            {
+#if NETFRAMEWORK
+                if (_freeFormatStates.Count > 0)
+                {
+                    _currentFormat = _freeFormatStates.Pop();
+                }
+                else
+#else
+                if (!_freeFormatStates.TryPop(out _currentFormat))
+#endif
+                {
+                    _currentFormat = new Format();
                 }
             }
 
@@ -298,11 +334,20 @@ namespace ACadSharp.Entities
 #if NET6_0_OR_GREATER
                 if (Enum.TryParse<TEnum>(content, out value))
                     return true;
+#elif NETSTANDARD2_1_OR_GREATER
+
+                // Fallback when the enum can't parse a span directly.
+                if (int.TryParse(content, out var intValue))
+                {
+                    value = Unsafe.As<int, TEnum>(ref intValue);
+                    return true;
+                }
 #else
                 // Fallback when the enum can't parse a span directly.
                 if (Enum.TryParse<TEnum>(content.ToString(), out value))
                     return true;
 #endif
+                value = default;
                 return false;
             }
 
@@ -361,15 +406,19 @@ namespace ACadSharp.Entities
                 return false;
             }
 
-
+            /// <summary>
+            /// Parses the paragraph codes and sets the current format with the values.
+            /// </summary>
+            /// <param name="spanText"></param>
+            /// <returns></returns>
             private bool trySetParagraphCodes(ReadOnlySpan<char> spanText)
             {
                 var startPosition = _position + 1;
-                _tempSlices.Clear();
 
                 if (!tryGetControlCodeValue(spanText, out var content))
                     return false;
 
+                _currentFormat.Paragraph.Clear();
                 var startIndex = 0;
 
                 for (int i = 0; i < content.Length; i++)
@@ -380,7 +429,7 @@ namespace ACadSharp.Entities
                         if (i + 1 > content.Length)
                             return false;
 
-                        _tempSlices.Add(_content.Slice(startPosition + startIndex, i - startIndex));
+                        _currentFormat.Paragraph.Add(_content.Slice(startPosition + startIndex, i - startIndex));
 
                         startIndex = i + 1;
                     }
@@ -388,10 +437,7 @@ namespace ACadSharp.Entities
 
                 // Add the last part.
                 if (startIndex != content.Length)
-                    _tempSlices.Add(_content.Slice(startIndex + startPosition, content.Length - startIndex));
-
-                _currentFormat.Paragraph = _tempSlices.ToArray();
-                _tempSlices.Clear();
+                    _currentFormat.Paragraph.Add(_content.Slice(startIndex + startPosition, content.Length - startIndex));
 
                 return true;
             }
@@ -403,9 +449,7 @@ namespace ACadSharp.Entities
                 if (!tryGetControlCodeValue(spanText, out var content))
                     return false;
                 
-                var s = content.ToString();
                 var startIndex = 0;
-
                 bool fontSet = false;
                 char formatCode = '0';
 
@@ -484,7 +528,6 @@ namespace ACadSharp.Entities
             /// <returns>True on success, false otherwise.</returns>
             private bool tryGetControlCodeValue(ReadOnlySpan<char> spanText, out ReadOnlySpan<char> value)
             {
-                _tempSlices.Clear();
                 // Consume the control letter.
                 if (!tryAdvance())
                 {
@@ -519,12 +562,12 @@ namespace ACadSharp.Entities
             /// Tries to parse a MText fraction.  Handles escapes decently.
             /// </summary>
             /// <param name="spanText">Text to read from.</param>
-            /// <param name="fractionToken">Parsed token if successful.  Invalid token if the method returns false.</param>
             /// <returns>True on success, false otherwise.</returns>
-            private bool tryParseFraction(ReadOnlySpan<char> spanText, out MTextTokenFraction fractionToken)
+            private bool tryParseFraction(ReadOnlySpan<char> spanText)
             {
-                fractionToken = new MTextTokenFraction(_currentFormat);
-                _tempSlices.Clear();
+                _mainBuffer.Clear();
+                List<ReadOnlyMemory<char>> buffer = _mainBuffer;
+                
                 bool numeratorSet = false;
                 bool fractionEscaped = false;
 
@@ -541,7 +584,7 @@ namespace ACadSharp.Entities
                     if (token == '\\')
                     {
                         if (fractionEscaped)
-                            _tempSlices.Add(_content.Slice(_position, 1));
+                            buffer.Add(_content.Slice(_position, 1));
 
                         fractionEscaped = !fractionEscaped;
                     }
@@ -556,8 +599,8 @@ namespace ACadSharp.Entities
                             // Skip the escape character.
                             if (_position - partStart - 1 > 0)
                             {
-                                _tempSlices.Add(_content.Slice(partStart, _position - partStart - 1));
-                                _tempSlices.Add(_content.Slice(_position, 1));
+                                buffer.Add(_content.Slice(partStart, _position - partStart - 1));
+                                buffer.Add(_content.Slice(_position, 1));
                                 partStart = _position + 1;
 
                                 if (!tryAdvance())
@@ -570,25 +613,30 @@ namespace ACadSharp.Entities
                         }
                         else if (partStart != _position)
                         {
-                            _tempSlices.Add(_content.Slice(partStart, _position - partStart));
+                            buffer.Add(_content.Slice(partStart, _position - partStart));
                         }
 
                         if (!numeratorSet)
                         {
-                            fractionToken.Numerator = _tempSlices.ToArray();
+                            _flushFractionValue.Numerator = buffer;
 
                             // If we are at the end and can't advance, then the fraction is broken.
                             if (!canAdvance())
                                 return false;
 
                             partStart = _position + 1;
-                            _tempSlices.Clear();
+
+                            // Switch over to the second buffer;
+                            buffer = _secondBuffer;
+
                         }
                         else
                         {
-                            fractionToken.Denominator = _tempSlices.ToArray();
-                            _tempSlices.Clear();
-                            _visitor(fractionToken);
+                            _flushFractionValue.Format = _currentFormat;
+                            _flushFractionValue.Denominator = buffer;
+                            _visitor(_flushFractionValue);
+                            _mainBuffer.Clear();
+                            _secondBuffer.Clear();
                             return true;
                         }
 
@@ -615,7 +663,7 @@ namespace ACadSharp.Entities
                 // If there is a gap here, we need to add the range to the list.
                 if (_textValueEnd != _position)
                 {
-                    _flushChunks.Add(_content.Slice(_textValueStart, _position - _textValueStart - 1));
+                    _mainBuffer.Add(_content.Slice(_textValueStart, _position - _textValueStart - 1));
                     _textValueStart = _position;
                     _textValueEnd = _position + 1;
                     return;
@@ -633,17 +681,21 @@ namespace ACadSharp.Entities
             {
                 if (_textValueEnd > _textValueStart)
                 {
-                    _flushChunks.Add(_content.Slice(_textValueStart, _textValueEnd - _textValueStart));
+                    _mainBuffer.Add(_content.Slice(_textValueStart, _textValueEnd - _textValueStart));
                     _textValueStart = -1;
                     _textValueEnd = -1;
                 }
 
-                if (_flushChunks.Count > 0)
+                if (_mainBuffer.Count > 0)
                 {
-                    _visitor(new MText.TokenValue(_currentFormat, _flushChunks.ToArray()));
-                    _flushChunks.Clear();
+                    _flushTokenValue.Format = _currentFormat;
+                    _flushTokenValue.Values = _mainBuffer;
+                    _visitor(_flushTokenValue);
+                    _mainBuffer.Clear();
                 }
             }
+
+            
 
             /// <summary>
             /// Tries to advance the position in the reader.
@@ -667,10 +719,10 @@ namespace ACadSharp.Entities
             public void Dispose()
             {
                 _fontStateStack.Clear();
-                _flushChunks.Clear();
-                _flushChunks.TrimExcess();
-                _tempSlices.Clear();
-                _tempSlices.Capacity = 0;
+                _mainBuffer.Clear();
+                _mainBuffer.TrimExcess();
+                _secondBuffer.Clear();
+                _secondBuffer.Capacity = 0;
             }
         }
     }

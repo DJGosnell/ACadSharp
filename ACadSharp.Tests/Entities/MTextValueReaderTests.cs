@@ -55,7 +55,7 @@ namespace ACadSharp.Tests.Entities
 
         public static IEnumerable<object[]> FormatsData = new List<object[]>()
         {
-            new[]
+            /*new[]
             {
                 new MTextFormatsTestData(@"\A0;BOTTOM",
                     new MText.TokenValue(new() { Align = MText.Format.Alignment.Bottom }, "BOTTOM"))
@@ -119,7 +119,7 @@ namespace ACadSharp.Tests.Entities
                         new MText.TokenValue(new("K"), "FORMATTED"),
                         new MText.TokenValue("AFTER"),
                     })
-            },
+            },*/
             new[]
             {
                 new MTextFormatsTestData(@"BEFORE\KFORMATTED\kAFTER",
@@ -130,7 +130,7 @@ namespace ACadSharp.Tests.Entities
                         new MText.TokenValue(new("k"), "AFTER"),
                     })
             },
-            new[]
+            /*new[]
             {
                 new MTextFormatsTestData(@"BEFORE\T2;FORMATTED",
                     new[] { new MText.TokenValue("BEFORE"), new MText.TokenValue(new() { Tracking = 2 }, "FORMATTED") })
@@ -170,7 +170,7 @@ namespace ACadSharp.Tests.Entities
                     {
                         Paragraph = new[] { "i-70.76154".AsMemory(), "l70.76154".AsMemory(), "t70.76154".AsMemory() }
                     }, "FORMATTED"))
-            },
+            },*/
         };
 
         [Theory, MemberData(nameof(FormatsData))]
@@ -183,7 +183,7 @@ namespace ACadSharp.Tests.Entities
         {
             new[]
             {
-                new MTextFormatsTestData(@"{\fArial|b0|i1|c22|p123;FORMAT}",
+                new MTextFormatsTestData(@"{\fArial|b0|i1|c22|p123;FORMAT}AFTER",
                     new[]
                     {
                         new MText.TokenValue(new MText.Format()
@@ -197,6 +197,7 @@ namespace ACadSharp.Tests.Entities
                                 Pitch = 123
                             }
                         }, "FORMAT"),
+                        new MText.TokenValue("AFTER"),
                     })
             },
         };
@@ -236,55 +237,72 @@ namespace ACadSharp.Tests.Entities
             new[]
             {
                 new MTextFormatsTestData(@"\S1^2;",
-                    new MText.MTextTokenFraction("1", "2", MText.MTextTokenFraction.Divider.Stacked))
+                    new MText.TokenFraction("1", "2", MText.TokenFraction.Divider.Stacked))
             },
             new[]
             {
                 new MTextFormatsTestData(@"\S1/2;",
-                    new MText.MTextTokenFraction("1", "2", MText.MTextTokenFraction.Divider.FractionBar))
+                    new MText.TokenFraction("1", "2", MText.TokenFraction.Divider.FractionBar))
             },
             new[]
             {
                 new MTextFormatsTestData(@"\S1#2;",
-                    new MText.MTextTokenFraction("1", "2", MText.MTextTokenFraction.Divider.Condensed))
+                    new MText.TokenFraction("1", "2", MText.TokenFraction.Divider.Condensed))
             },
             new[]
             {
                 new MTextFormatsTestData(@"\SNUM^DEN;",
-                    new MText.MTextTokenFraction("NUM", "DEN", MText.MTextTokenFraction.Divider.Stacked))
+                    new MText.TokenFraction("NUM", "DEN", MText.TokenFraction.Divider.Stacked))
             },
             new[]
             {
                 new MTextFormatsTestData(@"\SNUM/DEN;",
-                    new MText.MTextTokenFraction("NUM", "DEN", MText.MTextTokenFraction.Divider.FractionBar))
+                    new MText.TokenFraction("NUM", "DEN", MText.TokenFraction.Divider.FractionBar))
             },
             new[]
             {
                 new MTextFormatsTestData(@"\SNUM#DEN;",
-                    new MText.MTextTokenFraction("NUM", "DEN", MText.MTextTokenFraction.Divider.Condensed))
+                    new MText.TokenFraction("NUM", "DEN", MText.TokenFraction.Divider.Condensed))
             },
 
             // Escapes
             new[]
             {
                 new MTextFormatsTestData(@"\SNUM#DEN\;;",
-                    new MText.MTextTokenFraction("NUM", "DEN;", MText.MTextTokenFraction.Divider.Condensed))
+                    new MText.TokenFraction("NUM", "DEN;", MText.TokenFraction.Divider.Condensed))
             },
             new[]
             {
                 new MTextFormatsTestData(@"\SNUM\##DEN\;;",
-                    new MText.MTextTokenFraction("NUM#", "DEN;", MText.MTextTokenFraction.Divider.Condensed))
+                    new MText.TokenFraction("NUM#", "DEN;", MText.TokenFraction.Divider.Condensed))
             },
 
             // Unexpected end to string.
-            new[] { new MTextFormatsTestData(@"\SNUMDEN\;;", (MText.MTextToken?)null) },
-            new[] { new MTextFormatsTestData(@"\SNUMDEN", (MText.MTextToken?)null) },
+            new[] { new MTextFormatsTestData(@"\SNUMDEN\;;", (MText.Token?)null) },
+            new[] { new MTextFormatsTestData(@"\SNUMDEN", (MText.Token?)null) },
         };
 
         [Theory, MemberData(nameof(FractionsData))]
         public void Fractions(MTextFormatsTestData data)
         {
             TestFormatData(data);
+        }
+
+
+        public static IEnumerable<object[]> ParseData = new List<object[]>()
+        {
+            new object[]
+            {
+                @"\A1;\P{\OOVERSTRIKE}\P{\LUNDERLINE}\P{STRIKE-THROUGH}\P{\fArial|b1|i0|c0|p34;BOLD}\P{\fArial|b0|i1|c0|p34;ITALIC\P\H0.7x;\SSUPERSET^;\H1.42857x;\P\H0.7x;\S^SUBSET;\H1.42857x;\P\H0.7x;\S1/2;\H1.42857x;\P\fArial|b0|i0|c0|p34;\P\pi-21.34894,l21.34894,t21.34894;\fSymbol|b0|i0|c2|p18;·	\fArial|b0|i0|c0|p34;BULLET 1\P\fSymbol|b0|i0|c2|p18;·	\fArial|b0|i0|c0|p34;BULLET 2\P\fSymbol|b0|i0|c2|p18;·	\fArial|b0|i0|c0|p34;BULLET 3\P\pi0,l0,tz;\P\pi-21.34894,l21.34894,t21.34894;a.	LOWERCASE LETTER A\Pb.	LOWERCASE LETTER B\Pc.	LOWERCASE LETTER C\P\pi0,l0,tz;\P\pi-21.34894,l21.34894,t21.34894;A.	UPPERCASE LETTER A\PB.	UPPERCASE LETTER B\PC.	UPPERCASE LETTER C\P\pi0,l0,tz;\P\pi-21.34894,l21.34894,t21.34894;1.	NUMBERED 1\P2.	NUMBERED 2\P3.	NUMBERED 3\P\pi0,l0,tz;\P\{TEST\}\P\PNOTE 1:	NOTE TEXT 1"" 2"" 3' 4'\P\\A1;\P\\P\PNOTE 2:	NOTE TEXT.\P}NESTED FORMATTING {\fArial|b1|i0|c0|p34;BOLD \fArial|b1|i1|c0|p34;ITALICS \LUNDERLINE \H2.24835x;FONT \fBaby Kruffy|b1|i1|c0|p2;DIFFERENT\fArial|b1|i1|c0|p34;\H0.44477x; \OOVERLINE \H0.7x;\SSUPER-TEXT^;\H1.42857x; \H0.7x;\S^SUB-TEXT;}",
+                22
+            },
+        };
+
+        [Theory, MemberData(nameof(ParseData))]
+        public void Parse(string text, int expectedParts)
+        {
+            var reader = new MText.ValueReader();
+            var parts = reader.Parse(text);
         }
 
         private void TestFormatData(MTextFormatsTestData data)

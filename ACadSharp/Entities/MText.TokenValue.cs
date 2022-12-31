@@ -6,10 +6,14 @@ namespace ACadSharp.Entities
 {
     public partial class MText
     {
-        public class TokenValue : MTextToken
+        public class TokenValue : Token
         {
-            public ReadOnlyMemory<char>[] Values { get; internal set; }
+            public IReadOnlyList<ReadOnlyMemory<char>> Values { get; internal set; }
             public string CombinedValues => string.Concat(Values);
+
+            public TokenValue()
+            {
+            }
 
             public TokenValue(MText.Format fontState, ReadOnlyMemory<char> value)
                 : base(fontState)

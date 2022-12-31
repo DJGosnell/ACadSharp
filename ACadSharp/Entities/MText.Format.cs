@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace ACadSharp.Entities
 {
@@ -16,14 +17,14 @@ namespace ACadSharp.Entities
             public bool? IsUnderline { get; set; } = null;
             public bool? IsOverline { get; set; } = null;
             public bool? IsStrikeThrough { get; set; } = null;
-            public Font Font { get; set; }
+            public Font Font { get; }
             public float? Height { get; set; } = null;
             public float? Width { get; set; } = null;
             public float? Obliquing { get; set; } = null;
             public float? Tracking { get; set; } = null;
             public Alignment? Align { get; set; } = Alignment.Center;
             public Color? Color { get; set; }
-            public ReadOnlyMemory<char>[]? Paragraph { get; set; } = null;
+            public List<ReadOnlyMemory<char>> Paragraph { get; } = new List<ReadOnlyMemory<char>>();
 
             public Format()
             {
@@ -44,7 +45,6 @@ namespace ACadSharp.Entities
                 Color = original.Color;
                 Paragraph = original.Paragraph;
             }
-
 
             internal Format(string formats)
             {
@@ -70,6 +70,38 @@ namespace ACadSharp.Entities
                 Font = new Font();
             }
 
+            public void CopyValues(Format source)
+            {
+                IsUnderline = source.IsUnderline;
+                IsOverline = source.IsOverline;
+                IsStrikeThrough = source.IsStrikeThrough;
+                Font.CopyValues(source.Font);
+                Height = source.Height;
+                Width = source.Width;
+                Obliquing = source.Obliquing;
+                Tracking = source.Tracking;
+                Align = source.Align;
+                Color = source.Color;
+                Paragraph.Clear();
+                Paragraph.AddRange(source.Paragraph);
+            }
+
+            public void Reset()
+            {
+                IsUnderline = null;
+                IsOverline = null;
+                IsStrikeThrough = null;
+                Font.Reset();
+                Height = null;
+                Width = null;
+                Obliquing = null;
+                Tracking = null;
+                Align = null;
+                Color = null;
+                Paragraph.Clear();
+            }
+
+
             public override bool Equals(object obj)
             {
                 return Equals(obj as Format);
@@ -77,6 +109,9 @@ namespace ACadSharp.Entities
 
             public bool Equals(Format other)
             {
+                if (other == null)
+                    return false;
+
                 var paragraphsEqual = false;
 
                 if (Nullable.Equals(Paragraph, other.Paragraph))
@@ -87,18 +122,25 @@ namespace ACadSharp.Entities
                 {
                     if (Paragraph != null 
                         && other.Paragraph != null 
-                        && Paragraph.Length == other.Paragraph.Length)
+                        && Paragraph.Count == other.Paragraph.Count)
                     {
-                        for (int i = 0; i < Paragraph.Length; i++)
+                        if (Paragraph.Count == 0)
                         {
-                            if (Paragraph[i].Span.SequenceEqual(other.Paragraph[i].Span))
+                            paragraphsEqual = true;
+                        }
+                        else
+                        {
+                            for (int i = 0; i < Paragraph.Count; i++)
                             {
-                                paragraphsEqual = true;
-                            }
-                            else
-                            {
-                                paragraphsEqual = false;
-                                break;
+                                if (Paragraph[i].Span.SequenceEqual(other.Paragraph[i].Span))
+                                {
+                                    paragraphsEqual = true;
+                                }
+                                else
+                                {
+                                    paragraphsEqual = false;
+                                    break;
+                                }
                             }
                         }
                     }

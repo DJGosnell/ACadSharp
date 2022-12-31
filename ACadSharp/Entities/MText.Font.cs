@@ -6,7 +6,7 @@ namespace ACadSharp.Entities
     {
         public class Font
         {
-            public ReadOnlyMemory<char>? FontFamily { get; set; } = null;
+            public ReadOnlyMemory<char> FontFamily { get; set; }
             public bool IsBold { get; set; } = false;
             public bool IsItalic { get; set; } = false;
             public int CodePage { get; set; } = 0;
@@ -42,6 +42,25 @@ namespace ACadSharp.Entities
                     IsItalic = false;
             }
 
+            public void CopyValues(Font source)
+            {
+                FontFamily = source.FontFamily;
+                IsBold = source.IsBold;
+                IsItalic = source.IsItalic;
+                CodePage = source.CodePage;
+                Pitch = source.Pitch;
+            }
+
+            public void Reset()
+            {
+                FontFamily = default;
+                IsBold = false;
+                IsItalic = false;
+                CodePage = 0;
+                Pitch = 0;
+            }
+
+
             public override bool Equals(object obj)
             {
                 return Equals(obj as Font);
@@ -49,15 +68,11 @@ namespace ACadSharp.Entities
 
             public bool Equals(Font other)
             {
-                var fontComparison = other.FontFamily.HasValue
-                    ? other.FontFamily.Value.Span
-                    : ReadOnlySpan<char>.Empty;
-
-                var nullEqual = Nullable.Equals(FontFamily, other.FontFamily);
-                var comparisonEqual = FontFamily?.Span.SequenceEqual(fontComparison);
+                if(other == null)
+                    return false;
 
                 return
-                    (nullEqual || comparisonEqual == true)
+                    (FontFamily.Span.SequenceEqual(other.FontFamily.Span))
                     && IsBold == other.IsBold
                     && IsItalic == other.IsItalic
                     && CodePage == other.CodePage

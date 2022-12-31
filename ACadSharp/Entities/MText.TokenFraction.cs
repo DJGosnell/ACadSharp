@@ -6,7 +6,7 @@ namespace ACadSharp.Entities
 {
     public partial class MText
     {
-        public class MTextTokenFraction : MTextToken
+        public class TokenFraction : Token
         {
             public enum Divider
             {
@@ -14,26 +14,30 @@ namespace ACadSharp.Entities
                 FractionBar,
                 Condensed
             }
-            public ReadOnlyMemory<char>[] Numerator { get; set; }
+            public IReadOnlyList<ReadOnlyMemory<char>> Numerator { get; internal set; }
 
             public string NumeratorCombined => string.Concat(Numerator);
-            public ReadOnlyMemory<char>[] Denominator { get; set; }
+            public IReadOnlyList<ReadOnlyMemory<char>> Denominator { get; internal set; }
 
             public string DenominatorCombined => string.Concat(Denominator);
 
             public Divider DividerType { get; set; }
 
-            public MTextTokenFraction(MText.Format format)
+            public TokenFraction()
+            {
+            }
+
+            public TokenFraction(MText.Format format)
                 : base(format)
             {
             }
 
-            internal MTextTokenFraction(string? numerator, string? denominator, Divider divider)
+            internal TokenFraction(string? numerator, string? denominator, Divider divider)
                 : this(new MText.Format(), numerator, denominator, divider)
             {
             }
 
-            internal MTextTokenFraction(MText.Format format, string? numerator, string? denominator, Divider divider)
+            internal TokenFraction(MText.Format format, string? numerator, string? denominator, Divider divider)
                 : base(format)
             {
                 Numerator = new[] { numerator.AsMemory() };
@@ -42,7 +46,7 @@ namespace ACadSharp.Entities
 
 
 
-            protected bool Equals(MTextTokenFraction other)
+            protected bool Equals(TokenFraction other)
             {
                 bool MemoryEqual(ReadOnlyMemory<char>? val1, ReadOnlyMemory<char>? val2)
                 {
@@ -80,12 +84,12 @@ namespace ACadSharp.Entities
                     return false;
                 }
 
-                return Equals((MTextTokenFraction)obj);
+                return Equals((TokenFraction)obj);
             }
 
             public override string ToString()
             {
-                return $"{Numerator}/{Denominator}; {DividerType}";
+                return $"{NumeratorCombined}/{DenominatorCombined}; {DividerType}";
             }
         }
 

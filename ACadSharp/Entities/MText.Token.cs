@@ -5,13 +5,17 @@ namespace ACadSharp.Entities
 {
     public partial class MText
     {
-        public abstract class MTextToken
+        public abstract class Token
         {
             public MText.Format Format { get; internal set; }
 
-            public MTextToken(MText.Format format)
+            protected Token(MText.Format format)
             {
                 Format = format;
+            }
+
+            protected Token()
+            {
             }
         }
     }
