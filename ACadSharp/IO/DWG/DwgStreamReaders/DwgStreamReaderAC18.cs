@@ -8,6 +8,7 @@ namespace ACadSharp.IO.DWG
 	internal class DwgStreamReaderAC18 : DwgStreamReaderAC15
 	{
 		public DwgStreamReaderAC18(Stream stream, bool resetPosition) : base(stream, resetPosition) { }
+		
 		public override string ReadTextUnicode()
 		{
 			short textLength = this.ReadShort<LittleEndianConverter>();
@@ -23,6 +24,7 @@ namespace ACadSharp.IO.DWG
 					TextEncoding.GetListedEncoding(CodePage.Windows1252))
 					.Replace("\0", "");
 			}
+
 			return value;
 		}
 
@@ -35,10 +37,9 @@ namespace ACadSharp.IO.DWG
 			//BL: RGB value
 			int rgb = this.ReadBitLong();
 
-			byte id = this.ReadByte();
-
-			string colorName = string.Empty;
 			//RC: Color Byte(&1 => color name follows(TV),
+			byte id = this.ReadByte();
+			string colorName = string.Empty;
 			if ((id & 1) == 1)
 				colorName = this.ReadVariableText();
 
@@ -76,15 +77,13 @@ namespace ACadSharp.IO.DWG
 				else if ((flags & 0x8000) > 0)
 				{
 					//Next value is a BS containing the RGB value(last 24 bits).
-					color = new Color();
-					color.Index = (short)this.ReadBitLong();
-				}
+					color = new Color((short)this.ReadBitLong());
+                }
 				else
 				{
-					color = new Color();
-					//Color index: if no flags were set, the color is looked up by the color number (ACI color).
-					color.Index = (short)(size & 0b111111111111);
-				}
+                    //Color index: if no flags were set, the color is looked up by the color number (ACI color).
+                    color = new Color((short)(size & 0b111111111111));
+                }
 
 				//0x2000: color is followed by a transparency BL
 				if ((flags & 0x2000U) > 0U)

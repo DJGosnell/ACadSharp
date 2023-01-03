@@ -14,11 +14,16 @@
     <Description>C# library to read/write cad files like dxf/dwg.</Description>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>ACadSharp.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
 
   <PropertyGroup>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <Version>1.3.7-alpha</Version>
+    <Version>1.4.0-alpha</Version>
   </PropertyGroup>
 
   <Import Project="..\CSUtilities\CSMath\CSMath.projitems" Label="Shared" />
@@ -30,6 +35,10 @@
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Memory" Version="4.5.5" />
   </ItemGroup>
 
 </Project>
