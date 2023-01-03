@@ -248,16 +248,14 @@ namespace ACadSharp.Entities
                     {
                         _controlCode = false;
                         charBufferSpan[0] = '\n';
-                        _mainBuffer.Add(_charBuffer);
-                        flushText();
+                        flushText(_charBuffer);
                     }  
                     else if (_controlCode && token == '~')
                     {
                         // Non Breaking Space
                         _controlCode = false;
                         charBufferSpan[0] = '\u00A0';
-                        _mainBuffer.Add(_charBuffer);
-                        flushText();
+                        flushText(_charBuffer);
                     }
                     else if (!_controlCode && token == '{')
                     {
@@ -568,6 +566,7 @@ namespace ACadSharp.Entities
                 
                 bool numeratorSet = false;
                 bool fractionEscaped = false;
+                bool dividerSet = false;
 
                 // Advance once.
                 if (!tryAdvance())
@@ -616,6 +615,18 @@ namespace ACadSharp.Entities
 
                         if (!numeratorSet)
                         {
+                            if (!dividerSet)
+                            {
+                                dividerSet = true;
+                                _flushFractionValue.DividerType = token switch
+                                {
+                                    '^' => TokenFraction.Divider.Stacked,
+                                    '#' => TokenFraction.Divider.Condensed,
+                                    '/' => TokenFraction.Divider.FractionBar,
+                                    _ => TokenFraction.Divider.FractionBar
+                                };
+                            }
+
                             _flushFractionValue.Numerator = buffer;
 
                             // If we are at the end and can't advance, then the fraction is broken.
@@ -675,7 +686,7 @@ namespace ACadSharp.Entities
             /// <summary>
             /// Flushes the text to the visitor with the current formatting.
             /// </summary>
-            private void flushText()
+            private void flushText(ReadOnlyMemory<char>? append = null)
             {
                 if (_textValueEnd > _textValueStart)
                 {
@@ -683,6 +694,9 @@ namespace ACadSharp.Entities
                     _textValueStart = -1;
                     _textValueEnd = -1;
                 }
+
+                if(append != null)
+                    _mainBuffer.Add(append.Value);
 
                 if (_mainBuffer.Count > 0)
                 {

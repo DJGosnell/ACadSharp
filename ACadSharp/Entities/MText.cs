@@ -110,7 +110,7 @@ namespace ACadSharp.Entities
 			set
 			{
 				_alignmentPoint = value;
-				//this._rotation = new XY(this._alignmentPoint.X, this._alignmentPoint.Y).GetAngle();
+				this._rotation = new XY(this._alignmentPoint.X, this._alignmentPoint.Y).GetAngle();
 			}
 		}
 

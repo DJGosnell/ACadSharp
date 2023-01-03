@@ -39,9 +39,11 @@ namespace ACadSharp.Tests.Entities
         new [] { "0123456789", "0123456789" },
         new [] { "abcdefghijklmnopqrstuvwxyz", "abcdefghijklmnopqrstuvwxyz" },
         new [] { @"\P", "\n" },
+        new [] { @"1\P2", "1\n2" },
         new [] { @"\", @"\" },
         new [] { @"\~", "\u00A0" },
-    };
+        new [] { @"1\~2", "1\u00A02" },
+        };
 
         [Theory, MemberData(nameof(ReadsTextData))]
         public void ReadsText(string input, string expected)
@@ -49,8 +51,8 @@ namespace ACadSharp.Tests.Entities
             var reader = new MText.ValueReader();
             var parts = reader.Parse(input);
 
-            if (parts[0] is MText.TokenValue value1)
-                Assert.Equal(expected, value1.CombinedValues);
+            var combined = parts.OfType<MText.TokenValue>().Select(t => t.CombinedValues);
+            Assert.Equal(expected, string.Concat(combined));
         }
 
         public static IEnumerable<object[]> FormatsData = new List<object[]>()
@@ -170,6 +172,14 @@ namespace ACadSharp.Tests.Entities
                     {
                         Paragraph = { "i-70.76154".AsMemory(), "l70.76154".AsMemory(), "t70.76154".AsMemory() }
                     }, "FORMATTED"))
+            },
+            new[]
+            {
+                new MTextFormatsTestData(@"1\P2", new []
+                {
+                    new MText.TokenValue("1\n"),
+                    new MText.TokenValue("2"),
+                })
             },
         };
 
