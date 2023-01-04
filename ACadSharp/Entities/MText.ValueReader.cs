@@ -117,7 +117,50 @@ namespace ACadSharp.Entities
                 while (true)
                 {
                     var token = spanText[_position];
-                    if (token == '\\')
+                    if (token == '%' 
+                        && canAdvance(2) 
+                        && spanText[_position + 1] == '%')
+                    {
+                        _controlCode = false;
+                        token = spanText[_position + 2];
+                        if (token == 'D' || token == 'd')
+                        {
+                            charBufferSpan[0] = '°';
+                            flushText(_charBuffer);
+                        }   
+                        else if (token == 'P' || token == 'p')
+                        {
+                            charBufferSpan[0] = '±';
+                            flushText(_charBuffer);
+                        } 
+                        else if (token == 'C' || token == 'c')
+                        {
+                            charBufferSpan[0] = 'Ø';
+                            flushText(_charBuffer);
+                        }
+                        else if (token == '%')
+                        {
+                            charBufferSpan[0] = '%';
+                            flushText(_charBuffer);
+                        }
+                        else
+                        {
+                            pushTextEnd();
+                            continue;
+                        }
+
+                        if (canAdvance(3))
+                        {
+                            _position += 3;
+                            continue;
+                        }
+                        else
+                        {
+                            // If we can't advance 3, we are at the end.
+                            return true;
+                        }
+                    }
+                    else if (token == '\\')
                     {
                         if (_controlCode)
                             _mainBuffer.Add(_content.Slice(_position, 1));
@@ -723,9 +766,9 @@ namespace ACadSharp.Entities
             /// Checks to see if it is possible to advance the position in the reader.
             /// </summary>
             /// <returns>True if the end has not been reached.  False otherwise.</returns>
-            private bool canAdvance()
+            private bool canAdvance(int advanceAmount = 1)
             {
-                return _position + 1 < _length;
+                return _position + advanceAmount < _length;
             }
 
             public void Dispose()
