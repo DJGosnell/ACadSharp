@@ -1,4 +1,4 @@
-﻿using ACadSharp.Attributes;
+﻿#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -16,47 +16,55 @@ namespace ACadSharp.Entities
         /// </remarks>
         /// <seealso>
         /// https://www.cadforum.cz/en/text-formatting-codes-in-mtext-objects-tip8640
+        /// https://knowledge.autodesk.com/support/autocad-lt/learn-explore/caas/CloudHelp/cloudhelp/2019/ENU/AutoCAD-LT/files/GUID-7D8BB40F-5C4E-4AE5-BD75-9ED7112E5967-htm.html
+        /// https://knowledge.autodesk.com/support/autocad-lt/learn-explore/caas/CloudHelp/cloudhelp/2019/ENU/AutoCAD-LT/files/GUID-6F59DA4A-A790-4316-A79C-2CCE723A30CA-htm.html
         /// </seealso>
         public class ValueReader : IDisposable
         {
             private ReadOnlyMemory<char> _content;
             private int _length;
 
-            private int _position = 0;
+            private int _position;
             private int _textValueStart = -1;
             private int _textValueEnd;
-            private MText.TokenValue _flushTokenValue = new TokenValue();
-            private MText.TokenFraction _flushFractionValue = new TokenFraction();
+            private readonly TokenValue _flushTokenValue = new TokenValue();
+            private readonly TokenFraction _flushFractionValue = new TokenFraction();
 
-            private readonly Stack<MText.Format> _fontStateStack = new Stack<MText.Format>(4);
-            private readonly Stack<MText.Format> _freeFormatStates = new Stack<MText.Format>(4);
-            private MText.Format _currentFormat;
+            private readonly Stack<Format> _fontStateStack = new Stack<Format>(4);
+            private readonly Stack<Format> _freeFormatStates = new Stack<Format>(4);
+            private Format? _currentFormat;
 
             private readonly List<ReadOnlyMemory<char>> _mainBuffer = new List<ReadOnlyMemory<char>>(8);
             private readonly List<ReadOnlyMemory<char>> _secondBuffer = new List<ReadOnlyMemory<char>>(8);
-            private Action<Token> _visitor;
+            private Action<Token>? _visitor;
             private bool _controlCode;
 
             private readonly Memory<char> _charBuffer = new Memory<char>(new char[1]);
 
             /// <summary>
-            /// Parses the passed contest value.
+            /// Deserializes the passed contest value.
             /// </summary>
             /// <param name="content">Content to parse.</param>
             /// <returns>Parsed token list.  This is not a zero copy parsing process.</returns>
             /// <remarks>Not thread safe.</remarks>
-            public Token[] Parse(string content)
+            public Token[] Deserialize(string content)
             {
-                return Parse(content.AsMemory());
+                return Deserialize(content, null);
+            }
+
+            public Token[] Deserialize(string content, Format? baseFormat)
+            {
+                return Deserialize(content.AsMemory(), baseFormat);
             }
 
             /// <summary>
-            /// Parses the passed contest value.
+            /// Deserializes the passed contest value.
             /// </summary>
             /// <param name="content">Content to parse.</param>
+            /// <param name="baseFormat">This is the base format that will be used.</param>
             /// <returns>Parsed token list.  This is not a zero copy parsing process.</returns>
             /// <remarks>Not thread safe.</remarks>
-            public Token[] Parse(ReadOnlyMemory<char> content)
+            public Token[] Deserialize(ReadOnlyMemory<char> content, Format? baseFormat)
             {
                 var list = new List<Token>();
                 Walk(token =>
@@ -66,7 +74,7 @@ namespace ACadSharp.Entities
 
                     // Copy the values if we are not using the values when walking since the memory will change
                     // throughout the iteration.
-                    if (token is MText.TokenValue value)
+                    if (token is TokenValue value)
                     {
                         list.Add(new TokenValue()
                         {
@@ -74,7 +82,7 @@ namespace ACadSharp.Entities
                             Values = new[] { value.CombinedValues.AsMemory() }
                         });
                     }
-                    else if (token is MText.TokenFraction fraction)
+                    else if (token is TokenFraction fraction)
                     {
                         list.Add(new TokenFraction()
                         {
@@ -85,13 +93,13 @@ namespace ACadSharp.Entities
                         });
                     }
 
-                }, content);
+                }, content, baseFormat);
 
                 return list.ToArray();
             }
 
             /// <summary>
-            /// Walks the content as it is being parsed.  The visitor is passed tokens to use.
+            /// Walks the content as it is being deserialized.  The visitor is passed tokens to use.
             /// </summary>
             /// <param name="visitor">Visitor to walk through the data as it is read.</param>
             /// <param name="content">Content to walk through.</param>
@@ -103,6 +111,24 @@ namespace ACadSharp.Entities
             /// </remarks>
             public bool Walk(Action<Token> visitor, ReadOnlyMemory<char> content)
             {
+                _currentFormat?.Reset();
+                return Walk(visitor, content, _currentFormat);
+            }
+
+            /// <summary>
+            /// Walks the content as it is being deserialized.  The visitor is passed tokens to use.
+            /// </summary>
+            /// <param name="visitor">Visitor to walk through the data as it is read.</param>
+            /// <param name="content">Content to walk through.</param>
+            /// <param name="baseFormat">This is the base format that will be used.</param>
+            /// <returns>True on successful read.  False otherwise.</returns>
+            /// <remarks>
+            /// Walking is a zero copy parsing process.  This means that the content of the tokens
+            /// are not guaranteed to be valid beyond the return of the visitor.
+            /// Not Thread Safe.
+            /// </remarks>
+            public bool Walk(Action<Token> visitor, ReadOnlyMemory<char> content, Format? baseFormat)
+            {
                 _content = content;
                 _visitor = visitor;
                 _textValueStart = -1;
@@ -110,14 +136,63 @@ namespace ACadSharp.Entities
                 _length = _content.Length;
                 _controlCode = false;
                 _position = 0;
+                _currentFormat = baseFormat;
                 setNewCurrentFormat();
+
+                if (_currentFormat == null)
+                    throw new InvalidOperationException("Format is corrupted.");
 
                 var spanText = _content.Span;
                 var charBufferSpan = _charBuffer.Span;
                 while (true)
                 {
                     var token = spanText[_position];
-                    if (token == '\\')
+                    if (token == '%' 
+                        && canAdvance(2) 
+                        && spanText[_position + 1] == '%')
+                    {
+                        _controlCode = false;
+                        token = spanText[_position + 2];
+                        if (token == 'D' || token == 'd')
+                        {
+                            charBufferSpan[0] = '°';
+                            flushText(_charBuffer);
+                        }   
+                        else if (token == 'P' || token == 'p')
+                        {
+                            // ± (PLUS-MINUS SIGN)
+                            charBufferSpan[0] = '\u00B1';
+                            flushText(_charBuffer);
+                        } 
+                        else if (token == 'C' || token == 'c')
+                        {
+                            // Ø (LATIN CAPITAL LETTER O WITH STROKE)
+                            charBufferSpan[0] = '\u00D8';
+                            flushText(_charBuffer);
+                        }
+                        else if (token == '%')
+                        {
+                            charBufferSpan[0] = '%';
+                            flushText(_charBuffer);
+                        }
+                        else
+                        {
+                            pushTextEnd();
+                            continue;
+                        }
+
+                        if (canAdvance(3))
+                        {
+                            _position += 3;
+                            continue;
+                        }
+                        else
+                        {
+                            // If we can't advance 3, we are at the end.
+                            return true;
+                        }
+                    }
+                    else if (token == '\\')
                     {
                         if (_controlCode)
                             _mainBuffer.Add(_content.Slice(_position, 1));
@@ -128,7 +203,7 @@ namespace ACadSharp.Entities
                     {
                         _controlCode = false;
                         flushText();
-                        if (!tryParseEnum<MText.Format.Alignment>(spanText, out var value))
+                        if (!tryParseEnum<Format.Alignment>(spanText, out var value))
                             return false;
 
                         _currentFormat.Align = value;
@@ -173,10 +248,18 @@ namespace ACadSharp.Entities
                     {
                         _controlCode = false;
                         flushText();
-                        if (!tryParseControlCodeFloat(spanText, out var value))
+                        if (!tryParseControlCodeFloatWithX(spanText, out var value, out bool relative))
                             return false;
+                        _currentFormat.IsHeightRelative = relative;
 
-                        _currentFormat.Height = value;
+                        if (relative)
+                        {
+                            _currentFormat.Height *= value;
+                        }
+                        else
+                        {
+                            _currentFormat.Height = value;
+                        }
                     }
                     else if (_controlCode && token == 'Q')
                     {
@@ -244,26 +327,18 @@ namespace ACadSharp.Entities
                         flushText();
                         _currentFormat.IsStrikeThrough = false;
                     }
-                    else if (_controlCode && token == 'k')
-                    {
-                        _controlCode = false;
-                        flushText();
-                        _currentFormat.IsStrikeThrough = false;
-                    }
                     else if (_controlCode && token == 'P')
                     {
                         _controlCode = false;
                         charBufferSpan[0] = '\n';
-                        _mainBuffer.Add(_charBuffer);
-                        flushText();
+                        flushText(_charBuffer);
                     }  
                     else if (_controlCode && token == '~')
                     {
                         // Non Breaking Space
                         _controlCode = false;
                         charBufferSpan[0] = '\u00A0';
-                        _mainBuffer.Add(_charBuffer);
-                        flushText();
+                        flushText(_charBuffer);
                     }
                     else if (!_controlCode && token == '{')
                     {
@@ -295,8 +370,18 @@ namespace ACadSharp.Entities
                         }
 
                         flushText();
+
+                        // Cleanup
                         _currentFormat.Reset();
                         _freeFormatStates.Push(_currentFormat);
+
+                        // Should not do anything
+                        _fontStateStack.Clear();
+                        _visitor = null!;
+                        _controlCode = false;
+                        _content = null!;
+                        _mainBuffer.Clear();
+                        _secondBuffer.Clear();
                         return true;
                     }
 
@@ -305,18 +390,27 @@ namespace ACadSharp.Entities
 
             private void setNewCurrentFormat()
             {
+                // ReSharper disable once InlineOutVariableDeclaration
+                Format? newFormat;
 #if NETFRAMEWORK
                 if (_freeFormatStates.Count > 0)
                 {
-                    _currentFormat = _freeFormatStates.Pop();
+                    newFormat = _freeFormatStates.Pop();
                 }
                 else
 #else
-                if (!_freeFormatStates.TryPop(out _currentFormat))
+                if (!_freeFormatStates.TryPop(out newFormat))
 #endif
                 {
-                    _currentFormat = new Format();
+                    newFormat = new Format();
                 }
+                // Copy the formatting from the current format to the new format.
+                if (_currentFormat != null)
+                {
+                    newFormat.OverrideFrom(_currentFormat);
+                }
+
+                _currentFormat = newFormat;
             }
 
             /// <summary>
@@ -335,7 +429,7 @@ namespace ACadSharp.Entities
                 }
 
 #if NET6_0_OR_GREATER
-                if (Enum.TryParse<TEnum>(content, out value))
+                if (Enum.TryParse(content, out value))
                     return true;
 #elif NETSTANDARD2_1_OR_GREATER
 
@@ -384,9 +478,11 @@ namespace ACadSharp.Entities
             /// </summary>
             /// <param name="spanText">Text to read from.</param>
             /// <param name="value">Parsed value.  Invalid data on failure.</param>
+            /// <param name="trailingX">True if there is a training X</param>
             /// <returns>True on success, false otherwise.</returns>
-            private bool tryParseControlCodeFloat(ReadOnlySpan<char> spanText, out float value)
+            private bool tryParseControlCodeFloatWithX(ReadOnlySpan<char> spanText, out float value, out bool trailingX)
             {
+                trailingX = false;
                 if (!tryGetControlCodeValue(spanText, out var content))
                 {
                     value = -1;
@@ -396,7 +492,10 @@ namespace ACadSharp.Entities
                 // Sometimes there is an "x" at the end of the float value.  Remove it.
                 // ReSharper disable once UseIndexFromEndExpression
                 if (content[content.Length - 1] == 'x')
+                {
+                    trailingX = true;
                     content = content.Slice(0, content.Length - 1);
+                }
 
 #if NETFRAMEWORK
                 // Fallback when the enum can't parse a span directly.
@@ -410,7 +509,32 @@ namespace ACadSharp.Entities
             }
 
             /// <summary>
-            /// Parses the paragraph codes and sets the current format with the values.
+            /// Tries to parse a float from the control code value.
+            /// </summary>
+            /// <param name="spanText">Text to read from.</param>
+            /// <param name="value">Parsed value.  Invalid data on failure.</param>
+            /// <returns>True on success, false otherwise.</returns>
+            private bool tryParseControlCodeFloat(ReadOnlySpan<char> spanText, out float value)
+            {
+                if (!tryGetControlCodeValue(spanText, out var content))
+                {
+                    value = -1;
+                    return false;
+                }
+
+#if NETFRAMEWORK
+                // Fallback when the enum can't parse a span directly.
+                if (float.TryParse(content.ToString(), out value))
+                    return true;
+#else
+                if (float.TryParse(content, out value))
+                    return true;
+#endif
+                return false;
+            }
+
+            /// <summary>
+            /// Deserializes the paragraph codes and sets the current format with the values.
             /// </summary>
             /// <param name="spanText"></param>
             /// <returns></returns>
@@ -418,10 +542,9 @@ namespace ACadSharp.Entities
             {
                 var startPosition = _position + 1;
 
-                if (!tryGetControlCodeValue(spanText, out var content))
+                if (!tryGetControlCodeValue(spanText, out var content) || _currentFormat == null)
                     return false;
 
-                var s = content.ToString();
                 _currentFormat.Paragraph.Clear();
                 var startIndex = 0;
 
@@ -450,7 +573,7 @@ namespace ACadSharp.Entities
             {
                 var startPosition = _position + 1;
 
-                if (!tryGetControlCodeValue(spanText, out var content))
+                if (!tryGetControlCodeValue(spanText, out var content) || _currentFormat == null)
                     return false;
                 
                 var startIndex = 0;
@@ -574,6 +697,7 @@ namespace ACadSharp.Entities
                 
                 bool numeratorSet = false;
                 bool fractionEscaped = false;
+                bool dividerSet = false;
 
                 // Advance once.
                 if (!tryAdvance())
@@ -622,6 +746,18 @@ namespace ACadSharp.Entities
 
                         if (!numeratorSet)
                         {
+                            if (!dividerSet)
+                            {
+                                dividerSet = true;
+                                _flushFractionValue.DividerType = token switch
+                                {
+                                    '^' => TokenFraction.Divider.Stacked,
+                                    '#' => TokenFraction.Divider.Condensed,
+                                    '/' => TokenFraction.Divider.FractionBar,
+                                    _ => TokenFraction.Divider.FractionBar
+                                };
+                            }
+
                             _flushFractionValue.Numerator = buffer;
 
                             // If we are at the end and can't advance, then the fraction is broken.
@@ -638,7 +774,7 @@ namespace ACadSharp.Entities
                         {
                             _flushFractionValue.Format = _currentFormat;
                             _flushFractionValue.Denominator = buffer;
-                            _visitor(_flushFractionValue);
+                            _visitor?.Invoke(_flushFractionValue);
                             _mainBuffer.Clear();
                             _secondBuffer.Clear();
                             return true;
@@ -674,14 +810,13 @@ namespace ACadSharp.Entities
                 }
 
                 _textValueEnd++;
-                return;
             }
 
 
             /// <summary>
             /// Flushes the text to the visitor with the current formatting.
             /// </summary>
-            private void flushText()
+            private void flushText(ReadOnlyMemory<char>? append = null)
             {
                 if (_textValueEnd > _textValueStart)
                 {
@@ -690,11 +825,14 @@ namespace ACadSharp.Entities
                     _textValueEnd = -1;
                 }
 
+                if(append != null)
+                    _mainBuffer.Add(append.Value);
+
                 if (_mainBuffer.Count > 0)
                 {
                     _flushTokenValue.Format = _currentFormat;
                     _flushTokenValue.Values = _mainBuffer;
-                    _visitor(_flushTokenValue);
+                    _visitor?.Invoke(_flushTokenValue);
                     _mainBuffer.Clear();
                 }
             }
@@ -715,9 +853,9 @@ namespace ACadSharp.Entities
             /// Checks to see if it is possible to advance the position in the reader.
             /// </summary>
             /// <returns>True if the end has not been reached.  False otherwise.</returns>
-            private bool canAdvance()
+            private bool canAdvance(int advanceAmount = 1)
             {
-                return _position + 1 < _length;
+                return _position + advanceAmount < _length;
             }
 
             public void Dispose()
