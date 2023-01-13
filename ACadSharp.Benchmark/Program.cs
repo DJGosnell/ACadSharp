@@ -1,3 +1,4 @@
+using System.Text.Json;
 using BenchmarkDotNet.Running;
 
 namespace ACadSharp.Benchmark
@@ -6,7 +7,11 @@ namespace ACadSharp.Benchmark
     {
         public static void Main(string[] args)
         {
-            var summary = BenchmarkRunner.Run<Benchmarks>();
+	        new Benchmarks();
+
+			var summary = BenchmarkRunner.Run<Benchmarks>();
         }
+
+
     }
 }
