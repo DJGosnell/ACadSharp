@@ -1,6 +1,5 @@
 ﻿#nullable enable
 using System;
-using System.Diagnostics.CodeAnalysis;
 
 namespace ACadSharp.Entities
 {
@@ -9,7 +8,7 @@ namespace ACadSharp.Entities
 		/// <summary>
 		/// Font used by MText Tokens.
 		/// </summary>
-		public class Font
+		public class Font : IEquatable<Font>
 		{
 			/// <summary>
 			/// Tet Font Family.
@@ -42,31 +41,6 @@ namespace ACadSharp.Entities
 			public Font()
 			{
 
-			}
-
-			/// <summary>
-			/// Creates a font with the contents of the passed font.
-			/// </summary>
-			/// <param name="original">Original font to copy from.</param>
-			public Font(Font original)
-			{
-				this.OverrideFrom(original);
-			}
-
-			/// <summary>
-			/// Creates a font with the passed formats.  Used for testing.
-			/// </summary>
-			/// <param name="formats">Formats to use.</param>
-			internal Font(string formats)
-			{
-				// Used only for testing
-				if (formats.Contains("B")) this.IsBold = true;
-
-				if (formats.Contains("I")) this.IsItalic = true;
-
-				if (formats.Contains("b")) this.IsBold = false;
-
-				if (formats.Contains("i")) this.IsItalic = false;
 			}
 
 			/// <summary>
@@ -117,12 +91,12 @@ namespace ACadSharp.Entities
 					&& this.Pitch == other.Pitch;
 			}
 
-			[SuppressMessage("ReSharper", "NonReadonlyMemberInGetHashCode")]
 			public override int GetHashCode()
 			{
 #if NETFRAMEWORK
                 return base.GetHashCode();
 #else
+				// ReSharper disable all NonReadonlyMemberInGetHashCode
 				return HashCode.Combine(this.FontFamily, this.IsBold, this.IsItalic, this.CodePage, this.Pitch);
 #endif
 			}

@@ -8,7 +8,7 @@ namespace ACadSharp.Entities
 	public partial class MText
 	{
 		/// <summary>
-		/// Zero copy reader to parse AutoCAD M-Text value entries and return tokens.
+		/// Zero copy reader to deserialize AutoCAD M-Text value entries and return tokens.
 		/// </summary>
 		/// <remarks>
 		/// Main goal of this reader is to be a zero copy reader.
@@ -42,27 +42,35 @@ namespace ACadSharp.Entities
 			private readonly Memory<char> _charBuffer = new Memory<char>(new char[1]);
 
 			/// <summary>
-			/// Deserializes the passed contest value.
+			/// Deserializes the passed content value.
 			/// </summary>
-			/// <param name="content">Content to parse.</param>
-			/// <returns>Parsed token list.  This is not a zero copy parsing process.</returns>
+			/// <param name="content">Content to deserialize.</param>
+			/// <returns>Deserialized token list.  This is not a zero copy parsing process.</returns>
 			/// <remarks>Not thread safe.</remarks>
 			public Token[] Deserialize(string content)
 			{
 				return this.Deserialize(content, null);
 			}
 
+
+			/// <summary>
+			/// Deserializes the passed content value.
+			/// </summary>
+			/// <param name="content">Content to deserialize.</param>
+			/// <param name="baseFormat">This is the base format that will be used.</param>
+			/// <returns>Deserialized token list.  This is not a zero copy parsing process.</returns>
+			/// <remarks>Not thread safe.</remarks>
 			public Token[] Deserialize(string content, Format? baseFormat)
 			{
 				return this.Deserialize(content.AsMemory(), baseFormat);
 			}
 
 			/// <summary>
-			/// Deserializes the passed contest value.
+			/// Deserializes the passed content value.
 			/// </summary>
-			/// <param name="content">Content to parse.</param>
+			/// <param name="content">Content to deserialize.</param>
 			/// <param name="baseFormat">This is the base format that will be used.</param>
-			/// <returns>Parsed token list.  This is not a zero copy parsing process.</returns>
+			/// <returns>Deserialized token list.  This is not a zero copy parsing process.</returns>
 			/// <remarks>Not thread safe.</remarks>
 			public Token[] Deserialize(ReadOnlyMemory<char> content, Format? baseFormat)
 			{
@@ -392,11 +400,11 @@ namespace ACadSharp.Entities
 				// ReSharper disable once InlineOutVariableDeclaration
 				Format? newFormat;
 #if NETFRAMEWORK
-                if (this._freeFormatStates.Count > 0)
-                {
-                    newFormat = this._freeFormatStates.Pop();
-                }
-                else
+				if (this._freeFormatStates.Count > 0)
+				{
+					newFormat = this._freeFormatStates.Pop();
+				}
+				else
 #else
 				if (!this._freeFormatStates.TryPop(out newFormat))
 #endif
@@ -429,8 +437,8 @@ namespace ACadSharp.Entities
 				}
 
 #if NET6_0_OR_GREATER
-                if (Enum.TryParse(content, out value))
-                    return true;
+				if (Enum.TryParse(content, out value))
+					return true;
 #elif NETSTANDARD2_1_OR_GREATER
 
 				// Fallback when the enum can't parse a span directly.
@@ -440,9 +448,9 @@ namespace ACadSharp.Entities
 					return true;
 				}
 #else
-                // Fallback when the enum can't parse a span directly.
-                if (Enum.TryParse<TEnum>(content.ToString(), out value))
-                    return true;
+				// Fallback when the enum can't parse a span directly.
+				if (Enum.TryParse(content.ToString(), out value))
+					return true;
 #endif
 				value = default;
 				return false;
@@ -452,7 +460,7 @@ namespace ACadSharp.Entities
 			/// Tries to parse an int from the control code value.
 			/// </summary>
 			/// <param name="spanText">Text to read from.</param>
-			/// <param name="value">Parsed value.  Invalid data on failure.</param>
+			/// <param name="value">Deserialized value.  Invalid data on failure.</param>
 			/// <returns>True on success, false otherwise.</returns>
 			private bool tryParseControlCodeInt(ReadOnlySpan<char> spanText, out int value)
 			{
@@ -463,9 +471,9 @@ namespace ACadSharp.Entities
 				}
 
 #if NETFRAMEWORK
-                // Fallback when the enum can't parse a span directly.
-                if (int.TryParse(content.ToString(), out value))
-                    return true;
+				// Fallback when the enum can't parse a span directly.
+				if (int.TryParse(content.ToString(), out value))
+					return true;
 #else
 				if (int.TryParse(content, out value))
 					return true;
@@ -477,7 +485,7 @@ namespace ACadSharp.Entities
 			/// Tries to parse a float from the control code value.
 			/// </summary>
 			/// <param name="spanText">Text to read from.</param>
-			/// <param name="value">Parsed value.  Invalid data on failure.</param>
+			/// <param name="value">Deserialized value.  Invalid data on failure.</param>
 			/// <param name="trailingX">True if there is a training X</param>
 			/// <returns>True on success, false otherwise.</returns>
 			private bool tryParseControlCodeFloatWithX(ReadOnlySpan<char> spanText, out float value, out bool trailingX)
@@ -498,9 +506,9 @@ namespace ACadSharp.Entities
 				}
 
 #if NETFRAMEWORK
-                // Fallback when the enum can't parse a span directly.
-                if (float.TryParse(content.ToString(), out value))
-                    return true;
+				// Fallback when the enum can't parse a span directly.
+				if (float.TryParse(content.ToString(), out value))
+					return true;
 #else
 				if (float.TryParse(content, out value))
 					return true;
@@ -512,7 +520,7 @@ namespace ACadSharp.Entities
 			/// Tries to parse a float from the control code value.
 			/// </summary>
 			/// <param name="spanText">Text to read from.</param>
-			/// <param name="value">Parsed value.  Invalid data on failure.</param>
+			/// <param name="value">Deserialized value.  Invalid data on failure.</param>
 			/// <returns>True on success, false otherwise.</returns>
 			private bool tryParseControlCodeFloat(ReadOnlySpan<char> spanText, out float value)
 			{
@@ -523,9 +531,9 @@ namespace ACadSharp.Entities
 				}
 
 #if NETFRAMEWORK
-                // Fallback when the enum can't parse a span directly.
-                if (float.TryParse(content.ToString(), out value))
-                    return true;
+				// Fallback when the enum can't parse a span directly.
+				if (float.TryParse(content.ToString(), out value))
+					return true;
 #else
 				if (float.TryParse(content, out value))
 					return true;
@@ -556,7 +564,8 @@ namespace ACadSharp.Entities
 						if (i + 1 > content.Length)
 							return false;
 
-						this._currentFormat.Paragraph.Add(this._content.Slice(startPosition + startIndex, i - startIndex));
+						this._currentFormat.Paragraph.Add(this._content.Slice(startPosition + startIndex,
+							i - startIndex));
 
 						startIndex = i + 1;
 					}
@@ -564,7 +573,8 @@ namespace ACadSharp.Entities
 
 				// Add the last part.
 				if (startIndex != content.Length)
-					this._currentFormat.Paragraph.Add(this._content.Slice(startIndex + startPosition, content.Length - startIndex));
+					this._currentFormat.Paragraph.Add(this._content.Slice(startIndex + startPosition,
+						content.Length - startIndex));
 
 				return true;
 			}
@@ -586,7 +596,8 @@ namespace ACadSharp.Entities
 					{
 						if (!fontSet)
 						{
-							this._currentFormat.Font.FontFamily = this._content.Slice(startPosition + startIndex, i - startIndex);
+							this._currentFormat.Font.FontFamily =
+								this._content.Slice(startPosition + startIndex, i - startIndex);
 							fontSet = true;
 						}
 						else
@@ -606,8 +617,8 @@ namespace ACadSharp.Entities
 								case 'c':
 									slice = content.Slice(startIndex, i - startIndex);
 #if NETFRAMEWORK
-                                    if (!int.TryParse(slice.ToString(), out var codePage))
-                                        return false;
+									if (!int.TryParse(slice.ToString(), out var codePage))
+										return false;
 #else
 									if (!int.TryParse(slice, out var codePage))
 										return false;
@@ -619,8 +630,8 @@ namespace ACadSharp.Entities
 								case 'p':
 									slice = content.Slice(startIndex, i - startIndex);
 #if NETFRAMEWORK
-                                    if (!int.TryParse(slice.ToString(), out var pitch))
-                                        return false;
+									if (!int.TryParse(slice.ToString(), out var pitch))
+										return false;
 #else
 									if (!int.TryParse(slice, out var pitch))
 										return false;

@@ -9,13 +9,13 @@ namespace ACadSharp.Entities
 		/// <summary>
 		/// Contains a formatted value.
 		/// </summary>
-		public class TokenValue : Token
+		public class TokenValue : Token, IEquatable<TokenValue>
 		{
 			/// <summary>
 			/// Contains all the token values.  Will normally be multiple splices of memory.
 			/// </summary>
 			/// <remarks>Does not allocate.</remarks>
-			public IReadOnlyList<ReadOnlyMemory<char>>? Values { get; internal set; }
+			public IReadOnlyList<ReadOnlyMemory<char>>? Values { get; set; }
 
 			/// <summary>
 			/// Helper method which will combine all the <see cref="Values"/> into a single new string.
@@ -52,28 +52,6 @@ namespace ACadSharp.Entities
 				this.Values = values;
 			}
 
-			/// <summary>
-			/// Creates a token value with the passed parameters for it's starting state.  Used for testing.
-			/// </summary>
-			/// <param name="format">Current Format of the value.</param>
-			/// <param name="value">String value this token contains.</param>
-			internal TokenValue(Format format, string value)
-				: base(format)
-			{
-				this.Values = new[] { value.AsMemory() };
-			}
-
-			/// <summary>
-			/// Creates a token value with the passed parameters for it's starting state.  Used for testing.
-			/// </summary>
-			/// <param name="value">String value this token contains.</param>
-			internal TokenValue(string value)
-				: base(new Format())
-			{
-				this.Values = new[] { value.AsMemory() };
-			}
-
-
 			public override string ToString()
 			{
 				return this.CombinedValues;
@@ -81,22 +59,17 @@ namespace ACadSharp.Entities
 
 			public override bool Equals(object? obj)
 			{
-				if (ReferenceEquals(null, obj))
-				{
+				return this.Equals(obj as TokenValue);
+			}
+
+
+			public bool Equals(TokenValue? other)
+			{
+				if (other == null)
 					return false;
-				}
 
-				if (ReferenceEquals(this, obj))
-				{
-					return true;
-				}
-
-				if (obj.GetType() != this.GetType())
-				{
-					return false;
-				}
-
-				return ((TokenValue)obj).CombinedValues == this.CombinedValues;
+				return Token.AreSequencesEqual(this.Values, other.Values)
+				       && this.Format?.Equals(other.Format) == true;
 			}
 
 			public override int GetHashCode()
@@ -104,6 +77,7 @@ namespace ACadSharp.Entities
 #if NETFRAMEWORK
                 return base.GetHashCode();
 #else
+				// ReSharper disable all NonReadonlyMemberInGetHashCode
 				return HashCode.Combine(this.Format, this.Values);
 #endif
 			}

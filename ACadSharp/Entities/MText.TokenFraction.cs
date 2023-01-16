@@ -1,16 +1,15 @@
 ﻿#nullable enable
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 
 namespace ACadSharp.Entities
 {
-	public partial class MText
+	public partial class MText 
 	{
 		/// <summary>
 		/// Contains a formatted fraction value.
 		/// </summary>
-		public class TokenFraction : Token
+		public class TokenFraction : Token, IEquatable<TokenFraction>
 		{
 			/// <summary>
 			/// Type of divisor used to split the Numerator and Denominator.
@@ -37,7 +36,7 @@ namespace ACadSharp.Entities
 			/// Contains all the numerator token values.  Will normally be multiple splices of memory.
 			/// </summary>
 			/// <remarks>Does not allocate.</remarks>
-			public IReadOnlyList<ReadOnlyMemory<char>>? Numerator { get; internal set; }
+			public IReadOnlyList<ReadOnlyMemory<char>>? Numerator { get; set; }
 
 			/// <summary>
 			/// Helper method which will combine all the <see cref="Numerator"/> into a single new string.
@@ -49,7 +48,7 @@ namespace ACadSharp.Entities
 			/// Contains all the denominator token values.  Will normally be multiple splices of memory.
 			/// </summary>
 			/// <remarks>Does not allocate.</remarks>
-			public IReadOnlyList<ReadOnlyMemory<char>>? Denominator { get; internal set; }
+			public IReadOnlyList<ReadOnlyMemory<char>>? Denominator { get; set; }
 
 			/// <summary>
 			/// Helper method which will combine all the <see cref="Denominator"/> into a single new string.
@@ -77,67 +76,28 @@ namespace ACadSharp.Entities
 				: base(format)
 			{
 			}
-
-
-			/// <summary>
-			/// Creates a fraction token with the passed parameters for it's starting state. Used for testing.
-			/// </summary>
-			/// <param name="numerator">Numerator to set.</param>
-			/// <param name="denominator">Denominator to set.</param>
-			/// <param name="divider">Divisor to set.</param>
-			internal TokenFraction(string? numerator, string? denominator, Divider divider)
-				: this(new Format(), numerator, denominator, divider)
-			{
-			}
-
-			/// <summary>
-			/// Creates a fraction token with the passed parameters for it's starting state. Used for testing.
-			/// </summary>
-			/// <param name="format">Format to set.</param>
-			/// <param name="numerator">Numerator to set.</param>
-			/// <param name="denominator">Denominator to set.</param>
-			/// <param name="divider">Divisor to set.</param>
-			internal TokenFraction(Format format, string? numerator, string? denominator, Divider divider)
-				: base(format)
-			{
-				this.Numerator = new[] { numerator.AsMemory() };
-				this.Denominator = new[] { denominator.AsMemory() };
-				this.DividerType = divider;
-			}
-
-			protected bool equals(TokenFraction other)
-			{
-				return this.NumeratorCombined == other.NumeratorCombined
-				       && this.DenominatorCombined == other.DenominatorCombined
-				       && this.DividerType == other.DividerType;
-			}
-
 			public override bool Equals(object? obj)
 			{
-				if (ReferenceEquals(null, obj))
-				{
-					return false;
-				}
-
-				if (ReferenceEquals(this, obj))
-				{
-					return true;
-				}
-
-				if (obj.GetType() != this.GetType())
-				{
-					return false;
-				}
-
-				return this.equals((TokenFraction)obj);
+				return this.Equals(obj as TokenFraction);
 			}
 
-			[SuppressMessage("ReSharper", "NonReadonlyMemberInGetHashCode")]
+			public bool Equals(TokenFraction? other)
+			{
+				if (other == null)
+					return false;
+				
+				return Token.AreSequencesEqual(this.Numerator, other.Numerator)
+				       && Token.AreSequencesEqual(this.Denominator, other.Denominator)
+					   && this.DividerType == other.DividerType
+				       && this.Format?.Equals(other.Format) == true;
+			}
+
 			public override int GetHashCode()
 			{
 #if NETFRAMEWORK
                 return base.GetHashCode();
 #else
+				// ReSharper disable all NonReadonlyMemberInGetHashCode
 				return HashCode.Combine(this.Numerator, this.Denominator, (int)this.DividerType, this.Format);
 #endif
 			}
