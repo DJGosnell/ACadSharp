@@ -1,5 +1,6 @@
 ﻿#nullable enable
 using System;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -103,6 +104,9 @@ namespace ACadSharp.Entities
 
 			private static readonly ReadOnlyMemory<char> _tokenWidth = _tokens.Slice(100, 2);
 
+			private static readonly NumberFormatInfo _numberFormat = NumberFormatInfo.InvariantInfo;
+
+			private readonly Memory<char> _numberBuffer = new Memory<char>(new char[24]);
 			private int _lastConsumedPosition;
 			private int _position;
 			private ReadOnlyMemory<char> _values;
@@ -497,14 +501,29 @@ namespace ACadSharp.Entities
 					return;
 				}
 
-				Span<uint> outputArray = stackalloc uint[bufferLength];
+				var numberSpan = this._numberBuffer.Span;
 				var position = bufferLength - 1;
 				do
 				{
-					(value, outputArray[position--]) = divRem(value, 10);
+					(value, var integer) = divRem(value, 10);
+
+					numberSpan[position--] = integer switch
+					{
+						0 => '0',
+						1 => '1',
+						2 => '2',
+						3 => '3',
+						4 => '4',
+						5 => '5',
+						6 => '6',
+						7 => '7',
+						8 => '8',
+						9 => '9',
+						_ => throw new ArgumentOutOfRangeException()
+					};
 				} while (value != 0);
 
-				for (int i = 0; i < bufferLength; i++) this.outputNumber(outputArray[i]);
+				this._visitor?.Invoke(this._numberBuffer.Slice(0, bufferLength));
 			}
 
 			/// <summary>
@@ -613,6 +632,9 @@ namespace ACadSharp.Entities
 			/// <seealso>https://stackoverflow.com/a/41254697</seealso>
 			private void outputFloat(float value)
 			{
+				var numberSpan = this._numberBuffer.Span;
+
+				var numberSpan = this._numberBuffer.Span;
 				// Handle the 0 case
 				if (value == 0)
 				{
@@ -624,6 +646,7 @@ namespace ACadSharp.Entities
 				// Handle the negative case
 				if (isNegative)
 				{
+					numberSpan[0] = '-';
 					value = -value;
 				}
 

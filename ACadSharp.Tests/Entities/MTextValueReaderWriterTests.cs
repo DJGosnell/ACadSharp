@@ -56,7 +56,7 @@ namespace ACadSharp.Tests.Entities
 			var writer = new MText.ValueWriter();
 			var reader = new MText.ValueReader();
 
-			for (int j = 0; j < 100; j++)
+			for (int j = 0; j < 10000; j++)
 			{
 				var source = this.randomTokens(1, 50);
 				var serialized = writer.Serialize(source).ToString();

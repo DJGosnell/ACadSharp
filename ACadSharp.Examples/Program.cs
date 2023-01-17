@@ -5,6 +5,7 @@ using ACadSharp.Tables;
 using ACadSharp.Tables.Collections;
 using System;
 using System.Linq;
+using ACadSharp.Benchmark;
 
 namespace ACadSharp.Examples
 {
@@ -14,13 +15,15 @@ namespace ACadSharp.Examples
 
 		static void Main(string[] args)
 		{
-			CadDocument doc;
-			using (DwgReader reader = new DwgReader(file))
-			{
-				doc = reader.Read();
-			}
 
-			ExploreDocument(doc);
+			var s = 214124124L % 10;
+
+			var benchmark = new Benchmarks2();
+
+			for (int i = 0; i < 10000000; i++)
+			{
+				benchmark.WriterSerializeWalker();
+			}
 		}
 
 		/// <summary>

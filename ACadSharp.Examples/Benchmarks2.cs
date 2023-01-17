@@ -2,14 +2,9 @@
 using System.Collections.Generic;
 using System.IO;
 using ACadSharp.Entities;
-using BenchmarkDotNet;
-using BenchmarkDotNet.Attributes;
 
 namespace ACadSharp.Benchmark;
-
-[Config(typeof(FastConfig))] //comment out for marginally more accurate results
-[MemoryDiagnoser]
-public class Benchmarks
+public class Benchmarks2
 {
 	private readonly ReadOnlyMemory<char> _parseValue;
 	private readonly MText.ValueReader _reader;
@@ -17,7 +12,7 @@ public class Benchmarks
 	private readonly MText.ValueWriter _writer;
 	private readonly Random _random;
 
-	public Benchmarks()
+	public Benchmarks2()
 	{
 		this._random = new Random();
 		_reader = new MText.ValueReader();
@@ -28,26 +23,20 @@ public class Benchmarks
 		_deserializedValues = _reader.Deserialize(_parseValue, null);
 	}
 
-	[Benchmark]
 	public void ReaderDeserializeWalker()
 	{
 		_reader.DeserializeWalker(visit => { }, _parseValue);
 	}
 
-	[Benchmark]
 	public void ReaderDeserialize()
 	{
 		_reader.Deserialize(_parseValue, null);
 	}
-
-	[Benchmark]
 	public void WriterSerializeWalker()
 	{
 		_writer.SerializeWalker((in ReadOnlyMemory<char> walk) => { }, _deserializedValues);
 	}
 
-
-	[Benchmark]
 	public void WriterSerialize()
 	{
 		_writer.Serialize(_deserializedValues);
