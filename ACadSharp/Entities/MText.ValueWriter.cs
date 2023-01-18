@@ -1,6 +1,5 @@
 ﻿#nullable enable
 using System;
-using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -100,11 +99,9 @@ namespace ACadSharp.Entities
 			private static readonly ReadOnlyMemory<char> _token9 = _tokens.Slice(97, 1);
 
 			private static readonly ReadOnlyMemory<char> _tokenPeriod = _tokens.Slice(98, 1);
-			private static readonly ReadOnlyMemory<char> _tokenNegative = _tokens.Slice(99, 1);
+			//private static readonly ReadOnlyMemory<char> _tokenNegative = _tokens.Slice(99, 1);
 
 			private static readonly ReadOnlyMemory<char> _tokenWidth = _tokens.Slice(100, 2);
-
-			private static readonly NumberFormatInfo _numberFormat = NumberFormatInfo.InvariantInfo;
 
 			private readonly Memory<char> _numberBuffer = new Memory<char>(new char[24]);
 			private int _lastConsumedPosition;
@@ -629,12 +626,8 @@ namespace ACadSharp.Entities
 			/// </summary>
 			/// <param name="value">Float value to output</param>
 			/// <exception cref="ArgumentOutOfRangeException"></exception>
-			/// <seealso>https://stackoverflow.com/a/41254697</seealso>
 			private void outputFloat(float value)
 			{
-				var numberSpan = this._numberBuffer.Span;
-
-				var numberSpan = this._numberBuffer.Span;
 				// Handle the 0 case
 				if (value == 0)
 				{
@@ -642,46 +635,19 @@ namespace ACadSharp.Entities
 					return;
 				}
 
-				bool isNegative = value < 0;
-				// Handle the negative case
-				if (isNegative)
-				{
-					numberSpan[0] = '-';
-					value = -value;
-				}
 
-				int nbDecimals = 0;
-				while (value < 10000000)
-				{
-					value *= 10;
-					nbDecimals++;
-				}
+#if NETFRAMEWORK
+				value = (float)(Math.Truncate(value * 10000) / 10000f);
+				this._visitor!.Invoke(Math.Round(value, 4, MidpointRounding.ToEven).ToString("G").AsMemory());
+#else
+				var numberSpan = this._numberBuffer.Span;
+				// Round the values.
+				value = MathF.Truncate(value * 10000) / 10000f;
+				if (!value.TryFormat(numberSpan, out var charsWritten))
+					throw new InvalidOperationException("Can't format float.");
 
-				long valueLong = (long)Math.Round(value);
-				// Parse the number in reverse order
-				bool isLeadingZero = true;
-				Span<uint> outputArray = stackalloc uint[20];
-				int outPosition = 0;
-				while (valueLong != 0 || nbDecimals >= 0)
-				{
-					// We stop removing leading 0 when non-0 or decimal digit
-					if (valueLong % 10 != 0 || nbDecimals <= 0)
-						isLeadingZero = false;
-
-					// Write the last digit (unless a leading zero)
-					if (!isLeadingZero)
-						outputArray[outPosition++] = (uint)(valueLong % 10);
-
-					// Add the decimal point
-					if (--nbDecimals == 0 && !isLeadingZero)
-						outputArray[outPosition++] = 10;
-
-					valueLong /= 10;
-				}
-
-				if (isNegative) this._visitor!.Invoke(_tokenNegative);
-
-				for (int i = outPosition - 1; i >= 0; i--) this.outputNumber(outputArray[i]);
+				this._visitor!.Invoke(this._numberBuffer.Slice(0, charsWritten));
+#endif
 			}
 		}
 	}

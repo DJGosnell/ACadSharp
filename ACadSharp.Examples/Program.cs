@@ -15,9 +15,6 @@ namespace ACadSharp.Examples
 
 		static void Main(string[] args)
 		{
-
-			var s = 214124124L % 10;
-
 			var benchmark = new Benchmarks2();
 
 			for (int i = 0; i < 10000000; i++)
