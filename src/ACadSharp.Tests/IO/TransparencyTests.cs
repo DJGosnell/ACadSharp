@@ -1,4 +1,4 @@
-using ACadSharp.Entities;
+﻿using ACadSharp.Entities;
 using ACadSharp.IO;
 using ACadSharp.Tests.TestModels;
 using System.IO;
@@ -69,13 +69,62 @@ public class TransparencyTests : IOTestsBase
 	[InlineData(ACadVersion.AC1032)]
 	public void ByBlockColorKeepsByLayerTransparencyThroughDwg(ACadVersion version)
 	{
+		Point readPoint = this.roundTripPoint(version, Color.ByBlock, Transparency.ByLayer);
+
+		Assert.True(readPoint.Color.IsByBlock);
+		Assert.True(readPoint.Transparency.IsByLayer);
+	}
+
+	/// <summary>
+	/// The boundary the ByLayer rule stops at: a ByBlock colour does not by itself imply ByLayer
+	/// transparency. An explicit value sets flag 0x2000 and writes a transparency BL, so the field
+	/// is not 0 and the entity keeps the value it was given - including 0, which is a genuinely
+	/// opaque entity and not the absence of a transparency.
+	/// </summary>
+	[Theory]
+	[InlineData(ACadVersion.AC1018, (short)0)]
+	[InlineData(ACadVersion.AC1018, (short)50)]
+	[InlineData(ACadVersion.AC1024, (short)0)]
+	[InlineData(ACadVersion.AC1024, (short)50)]
+	[InlineData(ACadVersion.AC1027, (short)90)]
+	[InlineData(ACadVersion.AC1032, (short)0)]
+	[InlineData(ACadVersion.AC1032, (short)50)]
+	public void ByBlockColorKeepsAnExplicitTransparencyThroughDwg(ACadVersion version, short value)
+	{
+		Point readPoint = this.roundTripPoint(version, Color.ByBlock, new Transparency(value));
+
+		Assert.True(readPoint.Color.IsByBlock);
+		Assert.False(readPoint.Transparency.IsByLayer);
+		Assert.False(readPoint.Transparency.IsByBlock);
+		Assert.Equal(value, readPoint.Transparency.Value);
+	}
+
+	/// <summary>
+	/// ByBlock transparency is its own state as well: it sets 0x2000 and writes the BL with type
+	/// byte 1, so it is neither the 0 field nor an explicit percentage.
+	/// </summary>
+	[Theory]
+	[InlineData(ACadVersion.AC1018)]
+	[InlineData(ACadVersion.AC1024)]
+	[InlineData(ACadVersion.AC1027)]
+	[InlineData(ACadVersion.AC1032)]
+	public void ByBlockColorKeepsByBlockTransparencyThroughDwg(ACadVersion version)
+	{
+		Point readPoint = this.roundTripPoint(version, Color.ByBlock, Transparency.ByBlock);
+
+		Assert.True(readPoint.Color.IsByBlock);
+		Assert.True(readPoint.Transparency.IsByBlock);
+	}
+
+	private Point roundTripPoint(ACadVersion version, Color color, Transparency transparency)
+	{
 		CadDocument doc = new CadDocument();
 		doc.Header.Version = version;
 
 		Point point = new Point
 		{
-			Color = Color.ByBlock,
-			Transparency = Transparency.ByLayer,
+			Color = color,
+			Transparency = transparency,
 		};
 		doc.Entities.Add(point);
 
@@ -87,9 +136,8 @@ public class TransparencyTests : IOTestsBase
 		CadDocument read = DwgReader.Read(new MemoryStream(stream.ToArray()), this.onNotification);
 
 		Point readPoint = read.GetCadObject<Point>(handle);
-
 		Assert.NotNull(readPoint);
-		Assert.True(readPoint.Color.IsByBlock);
-		Assert.True(readPoint.Transparency.IsByLayer);
+
+		return readPoint;
 	}
 }
