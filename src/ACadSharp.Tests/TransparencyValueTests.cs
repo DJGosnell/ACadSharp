@@ -61,13 +61,23 @@ public class TransparencyValueTests
 	}
 
 	/// <summary>
-	/// The two ends of the alpha byte. 255 is fully opaque; 0 is the most transparent value the
-	/// encoding can express and decodes to 100, which is both outside the 0..90 range
-	/// <see cref="Transparency.Value"/> accepts and outside AutoCAD's own cap, so it is clamped.
+	/// The two ends of the alpha byte, and the boundary the clamp actually sits on. 255 is fully
+	/// opaque; 0 is the most transparent value the encoding can express and decodes to 100, which
+	/// is both outside the 0..90 range <see cref="Transparency.Value"/> accepts and outside
+	/// AutoCAD's own cap.
 	/// </summary>
+	/// <remarks>
+	/// Alpha 24 is the case that pins the bound rather than something ten steps past it: it is the
+	/// largest alpha byte that decodes above the cap (90.588, rounding to 91), so it is the first
+	/// value a clamp written one too high would let through - and letting it through is not a
+	/// wrong number but an <see cref="System.ArgumentOutOfRangeException"/> from the
+	/// <see cref="Transparency.Value"/> setter. The round trip below cannot reach it, because
+	/// <see cref="Transparency.ToAlphaValue"/> never emits an alpha byte below 25.
+	/// </remarks>
 	[Theory]
 	[InlineData(0x020000FF, 0)]
 	[InlineData(0x02000000, 90)]
+	[InlineData(0x02000018, 90)]
 	public void TheAlphaByteEndpointsClampIntoTheDocumentedRange(int packed, short expected)
 	{
 		Assert.Equal(expected, Transparency.FromAlphaValue(packed).Value);
