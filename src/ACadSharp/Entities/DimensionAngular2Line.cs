@@ -55,8 +55,10 @@ namespace ACadSharp.Entities
 		/// </summary>
 		/// <remarks>
 		/// False when either defining vector is zero, which is what a dimension whose subtype points
-		/// are all at the origin gives. <see cref="Measurement"/> throws in that case rather than
-		/// answering, so anything that must have a value asks this first.
+		/// are all at the origin gives. <see cref="Measurement"/> answers <c>0.0</c> in that case
+		/// rather than a measurement, so anything that must distinguish "the angle is zero" from
+		/// "there is no angle to measure" - a DWG write, which stores the value as a field of its
+		/// own - asks this first.
 		/// </remarks>
 		public bool IsMeasurable
 		{
@@ -72,6 +74,15 @@ namespace ACadSharp.Entities
 		{
 			get
 			{
+				//A zero vector has no angle, and AngleBetweenVectors throws on one. Answering 0.0
+				//matches DimensionAngular3Pt, whose own degenerate case returns it - and keeps a
+				//property getter from making a whole document unreadable. IsValid is what still
+				//declines the entity where the value has to be real.
+				if (!this.IsMeasurable)
+				{
+					return 0.0;
+				}
+
 				var v1 = this.SecondPoint - this.FirstPoint;
 				var v2 = this.DefinitionPoint - this.AngleVertex;
 				var angle = v1.AngleBetweenVectors(v2);
