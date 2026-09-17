@@ -1164,8 +1164,10 @@ internal abstract partial class DxfSectionWriterBase
 
 		if (polyline is PolygonMesh polygon)
 		{
+			//72 is the N count, not a second M. Writing M twice makes the grid square in the file,
+			//so a mesh whose vertex count is not M*M comes back as a different mesh or not at all.
 			this._writer.WriteIfNotDefault(71, polygon.MVertexCount, 0, map);
-			this._writer.WriteIfNotDefault(72, polygon.MVertexCount, 0, map);
+			this._writer.WriteIfNotDefault(72, polygon.NVertexCount, 0, map);
 			this._writer.WriteIfNotDefault(73, polygon.MSmoothSurfaceDensity, 0, map);
 			this._writer.WriteIfNotDefault(74, polygon.NSmoothSurfaceDensity, 0, map);
 		}
