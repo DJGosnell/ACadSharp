@@ -1109,6 +1109,10 @@ internal abstract class DxfSectionReaderBase
 					//emits at AC1009 - would otherwise throw a duplicate-key ArgumentException
 					//here, and the section reader's failsafe would drop the polyline, its
 					//vertices and its seqend without the caller hearing anything.
+					//The AcDb2dPolyline arm is the only one readLegacyPolyline can reach with the
+					//key present, because Polyline2D is the type it builds the map from; the other
+					//three are uniform with it rather than reachable. readDimension below uses
+					//TryAdd on every arm for the same reason.
 					case DxfSubclassMarker.Polyline:
 						tmp.SetPolyLineObject(new Polyline2D());
 						map.SubClasses.TryAdd(DxfSubclassMarker.Polyline, DxfClassMap.Create<Polyline2D>());
@@ -1698,7 +1702,8 @@ internal abstract class DxfSectionReaderBase
 						return true;
 					//TryAdd for the same reason as readPolyline's arms: the legacy path reads a
 					//vertex through readEntityCodes<Vertex2D>, whose map already holds
-					//AcDb2dVertex.
+					//AcDb2dVertex. That is the arm it can reach with the key present; the other
+					//four are uniform with it rather than reachable.
 					case DxfSubclassMarker.PolylineVertex:
 						tmp.SetVertexObject(new Vertex2D());
 						map.SubClasses.TryAdd(DxfSubclassMarker.PolylineVertex, DxfClassMap.Create<Vertex2D>());
