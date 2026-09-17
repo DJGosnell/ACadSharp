@@ -780,6 +780,25 @@ internal abstract class DxfSectionReaderBase
 			case 50:
 				if (tmp.CadObject is not DimensionLinear dim)
 				{
+					//Rebuilding the object as a linear dimension is right for a placeholder, and for
+					//an aligned dimension whose record turns out to be a rotated one - SetDimensionObject
+					//carries an aligned dimension's points across. It is wrong for every other subtype:
+					//nothing carries their points, so a stray group 50 on an angular, radial, diametric
+					//or ordinate record silently empties it and leaves Flags naming a type the object no
+					//longer is. Pre-R13 that subtype is already known, from the group code 70 this
+					//reader has read, so there is something to protect; from R13 the subclass markers
+					//decide and this arm is left exactly as it was.
+					if (this._builder.Version < ACadVersion.AC1012
+						&& tmp.CadObject is Dimension identified
+						and not CadDimensionTemplate.DimensionPlaceholder
+						and not DimensionAligned)
+					{
+						this._builder.Notify(
+							$"[{DxfFileToken.EntityDimension}] Group code 50 on a {identified.GetType().Name} record is not a rotation; ignored.",
+							NotificationType.Warning);
+						return true;
+					}
+
 					dim = new DimensionLinear();
 					tmp.SetDimensionObject(dim);
 				}

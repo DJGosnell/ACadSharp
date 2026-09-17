@@ -1,4 +1,4 @@
-using ACadSharp.Entities;
+﻿using ACadSharp.Entities;
 using ACadSharp.IO;
 using System.IO;
 using System.Linq;
@@ -31,12 +31,8 @@ public class DxfLegacyDimensionTypeTests : IOTestsBase
 	{
 	}
 
-	/// <summary>The R12 containers in the sample corpus — the same drawing, ASCII and binary.</summary>
-	public static TheoryData<string> R12Samples { get; } = new()
-	{
-		"sample_AC1009_ascii.dxf",
-		"sample_AC1009_binary.dxf",
-	};
+	/// <inheritdoc cref="R12Samples"/>
+	public static TheoryData<string> Samples => R12Samples.Theory;
 
 	/// <summary>
 	/// Every DIMENSION record in the file becomes a dimension in the document.
@@ -48,7 +44,7 @@ public class DxfLegacyDimensionTypeTests : IOTestsBase
 	/// still present and a dimension with no subtype is not.
 	/// </remarks>
 	[Theory]
-	[MemberData(nameof(R12Samples))]
+	[MemberData(nameof(Samples))]
 	public void EveryLegacyDimensionRecordBecomesADimension(string fileName)
 	{
 		CadDocument doc = DxfReader.Read(Path.Combine(TestVariables.SamplesFolder, fileName));
@@ -66,7 +62,7 @@ public class DxfLegacyDimensionTypeTests : IOTestsBase
 	/// <see cref="DimensionDiameter"/> — and it still reports the modifier it carried.
 	/// </remarks>
 	[Theory]
-	[MemberData(nameof(R12Samples))]
+	[MemberData(nameof(Samples))]
 	public void AModifierFlagDoesNotChangeTheSubtype(string fileName)
 	{
 		CadDocument doc = DxfReader.Read(Path.Combine(TestVariables.SamplesFolder, fileName));
@@ -90,7 +86,7 @@ public class DxfLegacyDimensionTypeTests : IOTestsBase
 	/// building the wrong types.
 	/// </remarks>
 	[Theory]
-	[MemberData(nameof(R12Samples))]
+	[MemberData(nameof(Samples))]
 	public void TheSubtypesAreTheOnesTheFlagWordsName(string fileName)
 	{
 		CadDocument doc = DxfReader.Read(Path.Combine(TestVariables.SamplesFolder, fileName));

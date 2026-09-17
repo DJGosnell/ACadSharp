@@ -1,4 +1,4 @@
-using ACadSharp.Entities;
+﻿using ACadSharp.Entities;
 using ACadSharp.IO;
 using CSMath;
 using System;
@@ -37,12 +37,8 @@ public class DxfLegacyDimensionPointsTests : IOTestsBase
 	{
 	}
 
-	/// <summary>The R12 containers in the sample corpus — the same drawing, ASCII and binary.</summary>
-	public static TheoryData<string> R12Samples { get; } = new()
-	{
-		"sample_AC1009_ascii.dxf",
-		"sample_AC1009_binary.dxf",
-	};
+	/// <inheritdoc cref="IO.DXF.R12Samples"/>
+	public static TheoryData<string> Samples => R12Samples.Theory;
 
 	/// <summary>
 	/// Every dimension in the fixture that declares subtype points, by handle.
@@ -69,9 +65,9 @@ public class DxfLegacyDimensionPointsTests : IOTestsBase
 
 	/// <summary>Cross product of every R12 container with every expected dimension.</summary>
 	public static IEnumerable<object[]> SamplesAndExpectedPoints()
-		=> from file in new[] { "sample_AC1009_ascii.dxf", "sample_AC1009_binary.dxf" }
+		=> from file in R12Samples.Names
 		   from row in ExpectedPoints()
-		   select new[] { file }.Concat(row).ToArray();
+		   select new object[] { file }.Concat(row).ToArray();
 
 	private static Dimension ByHandle(CadDocument doc, ulong handle)
 		=> Assert.Single(doc.Entities.OfType<Dimension>(), d => d.Handle == handle);
@@ -105,20 +101,31 @@ public class DxfLegacyDimensionPointsTests : IOTestsBase
 	/// The rotation of a rotated linear dimension, which lives on a second subclass map again.
 	/// </summary>
 	/// <remarks>
+	/// <para>
 	/// Handle 1300 is the fixture's one dimension with a rotation of its own — 30°, declared on
-	/// <c>AcDbRotatedDimension</c> while its points are on <c>AcDbAlignedDimension</c>. It is the
-	/// case no single <c>currentSubclass</c> can cover, and its measurement is the product of both:
-	/// the distance between the two points, projected onto the rotation.
+	/// <c>AcDbRotatedDimension</c> while its points are on <c>AcDbAlignedDimension</c>. Its
+	/// measurement is the product of both: the distance between the two points, projected onto the
+	/// rotation.
+	/// </para>
+	/// <para>
+	/// <b>Only the points here come through the subtype search.</b> Group code 50 is intercepted by
+	/// <c>readDimension</c>'s own <c>case 50:</c> arm, which returns before the default arm is
+	/// reached, so the rotation is assigned by that arm and not by a map lookup — asserted here
+	/// because it is true, not because it exercises the search. The two-map shape is real and is
+	/// why the reader searches rather than naming one marker, but no code in this fixture reaches
+	/// the second map; <see cref="TheSubtypeMapsAreRegisteredIncludingTheOneNoCodeReachesToday"/> is
+	/// what pins the part the search depends on.
+	/// </para>
 	/// </remarks>
 	[Theory]
-	[MemberData(nameof(R12Samples))]
+	[MemberData(nameof(Samples))]
 	public void ARotatedLinearDimensionCarriesBothItsPointsAndItsRotation(string fileName)
 	{
 		CadDocument doc = DxfReader.Read(Path.Combine(TestVariables.SamplesFolder, fileName));
 		DimensionLinear dim = Assert.IsType<DimensionLinear>(ByHandle(doc, 1300UL));
 
-		Assert.Equal(MathHelper.DegToRad(30.0), dim.Rotation, 9);
-		Assert.Equal(46.715617, dim.Measurement, 5);
+		Assert.Equal(MathHelper.DegToRad(30.0), dim.Rotation, 12);
+		Assert.Equal(46.7156167081414, dim.Measurement, 10);
 	}
 
 	/// <summary>
@@ -127,19 +134,25 @@ public class DxfLegacyDimensionPointsTests : IOTestsBase
 	/// <remarks>
 	/// The two angular kinds agreeing is the drawing's own symmetry — it draws the same angle twice,
 	/// once as a three-point dimension and once as a two-line one. Before this, one of the two
-	/// answered 0 and the other threw.
+	/// answered 0 and the other threw. They are compared to each other as well as to a literal,
+	/// because that agreement is the claim and two comparisons against one constant do not make it.
 	/// </remarks>
 	[Theory]
-	[MemberData(nameof(R12Samples))]
+	[MemberData(nameof(Samples))]
 	public void TheMeasurementsAreTheOnesTheGeometryGives(string fileName)
 	{
 		CadDocument doc = DxfReader.Read(Path.Combine(TestVariables.SamplesFolder, fileName));
 
-		Assert.Equal(1.647572, ByHandle(doc, 1301UL).Measurement, 5);
-		Assert.Equal(1.647572, ByHandle(doc, 1302UL).Measurement, 5);
-		Assert.Equal(11.399402, ByHandle(doc, 1311UL).Measurement, 5);
-		Assert.Equal(48.3635652, ByHandle(doc, 1319UL).Measurement, 6);
-		Assert.Equal(35.123332, ByHandle(doc, 3222UL).Measurement, 5);
+		double threePoint = ByHandle(doc, 1301UL).Measurement;
+		double twoLine = ByHandle(doc, 1302UL).Measurement;
+
+		Assert.Equal(1.6475682180646758, threePoint, 12);
+		Assert.Equal(1.6475682180646770, twoLine, 12);
+		Assert.Equal(threePoint, twoLine, 12);
+
+		Assert.Equal(11.3994016457580, ByHandle(doc, 1311UL).Measurement, 10);
+		Assert.Equal(48.3635652311060, ByHandle(doc, 1319UL).Measurement, 10);
+		Assert.Equal(35.1233315462732, ByHandle(doc, 3222UL).Measurement, 10);
 	}
 
 	/// <summary>
@@ -151,7 +164,7 @@ public class DxfLegacyDimensionPointsTests : IOTestsBase
 	/// number large enough to look like a measurement and be wrong by fifty times.
 	/// </remarks>
 	[Theory]
-	[MemberData(nameof(R12Samples))]
+	[MemberData(nameof(Samples))]
 	public void ARadialDimensionCarriesItsAngleVertex(string fileName)
 	{
 		CadDocument doc = DxfReader.Read(Path.Combine(TestVariables.SamplesFolder, fileName));
@@ -204,10 +217,51 @@ public class DxfLegacyDimensionPointsTests : IOTestsBase
 		Assert.All(maps, map => Assert.True(map.SubClasses.Count >= 3, $"{map.Name} has {map.SubClasses.Count} subclasses"));
 	}
 
+	/// <summary>
+	/// Every subclass map a pre-R13 dimension's type declares is registered, including the one no
+	/// code in the corpus currently reaches.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// The reader searches the maps rather than naming one because a <see cref="DimensionLinear"/>
+	/// spans two. Today group code 50 — the only code on <c>AcDbRotatedDimension</c> — is consumed
+	/// by <c>readDimension</c>'s <c>case 50:</c> arm before the search runs, so that second map is
+	/// registered and never read, and a mutation that skips it in the search kills nothing. What
+	/// the design does depend on is that it is *there*: registration is derived from the object's
+	/// concrete type rather than listed per arm, so a code added to that subclass resolves without
+	/// anyone remembering to register it.
+	/// </para>
+	/// <para>
+	/// What this asserts is the half of that the reader relies on and does not itself decide — that
+	/// <see cref="DxfMap"/> yields both maps for a <see cref="DimensionLinear"/>, with the points on
+	/// one and the rotation on the other. That the reader then registers all of them is structural:
+	/// <c>addDimensionSubclassMaps</c> enumerates <c>DxfMap.Create(obj.GetType()).SubClasses</c>, so
+	/// it cannot register a proper subset. Deleting that call is caught by the point assertions
+	/// above, not here.
+	/// </para>
+	/// </remarks>
+	[Fact]
+	public void TheSubtypeMapsAreRegisteredIncludingTheOneNoCodeReachesToday()
+	{
+		DxfMap linear = DxfMap.Create<DimensionLinear>();
+
+		Assert.Contains(DxfSubclassMarker.AlignedDimension, linear.SubClasses.Keys);
+		Assert.Contains(DxfSubclassMarker.LinearDimension, linear.SubClasses.Keys);
+
+		// The two-map shape itself: the points on one, the rotation on the other.
+		Assert.Contains(13, linear.SubClasses[DxfSubclassMarker.AlignedDimension].DxfProperties.Keys);
+		Assert.Contains(14, linear.SubClasses[DxfSubclassMarker.AlignedDimension].DxfProperties.Keys);
+		Assert.Contains(50, linear.SubClasses[DxfSubclassMarker.LinearDimension].DxfProperties.Keys);
+		Assert.DoesNotContain(50, linear.SubClasses[DxfSubclassMarker.AlignedDimension].DxfProperties.Keys);
+	}
+
+	/// <param name="name">Named in the failure message, so a failure says which slot moved.</param>
 	private static void AssertPoint(XYZ expected, XYZ actual, string name)
 	{
-		Assert.Equal(expected.X, actual.X, 6);
-		Assert.Equal(expected.Y, actual.Y, 6);
-		Assert.Equal(expected.Z, actual.Z, 6);
+		Assert.True(
+			Math.Round(expected.X, 6) == Math.Round(actual.X, 6)
+			&& Math.Round(expected.Y, 6) == Math.Round(actual.Y, 6)
+			&& Math.Round(expected.Z, 6) == Math.Round(actual.Z, 6),
+			$"{name}: expected {expected}, read {actual}");
 	}
 }
