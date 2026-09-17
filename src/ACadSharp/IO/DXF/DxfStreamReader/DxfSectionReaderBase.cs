@@ -802,36 +802,32 @@ internal abstract class DxfSectionReaderBase
 					{
 						case DimensionType.Linear:
 							tmp.SetDimensionObject(new DimensionLinear());
-							map.SubClasses.TryAdd(DxfSubclassMarker.AlignedDimension, DxfClassMap.Create<DimensionAligned>());
-							map.SubClasses.TryAdd(DxfSubclassMarker.LinearDimension, DxfClassMap.Create<DimensionLinear>());
 							break;
 						case DimensionType.Aligned:
 							tmp.SetDimensionObject(new DimensionAligned());
-							map.SubClasses.TryAdd(DxfSubclassMarker.AlignedDimension, DxfClassMap.Create<DimensionAligned>());
 							break;
 						case DimensionType.Angular:
 							tmp.SetDimensionObject(new DimensionAngular2Line());
-							map.SubClasses.TryAdd(DxfSubclassMarker.Angular2LineDimension, DxfClassMap.Create<DimensionAngular2Line>());
 							break;
 						case DimensionType.Diameter:
 							tmp.SetDimensionObject(new DimensionDiameter());
-							map.SubClasses.TryAdd(DxfSubclassMarker.DiametricDimension, DxfClassMap.Create<DimensionDiameter>());
 							break;
 						case DimensionType.Radius:
 							tmp.SetDimensionObject(new DimensionRadius());
-							map.SubClasses.TryAdd(DxfSubclassMarker.RadialDimension, DxfClassMap.Create<DimensionRadius>());
 							break;
 						case DimensionType.Angular3Point:
 							tmp.SetDimensionObject(new DimensionAngular3Pt());
-							map.SubClasses.TryAdd(DxfSubclassMarker.Angular3PointDimension, DxfClassMap.Create<DimensionAngular3Pt>());
 							break;
 						case DimensionType.Ordinate:
 							tmp.SetDimensionObject(new DimensionOrdinate());
-							map.SubClasses.TryAdd(DxfSubclassMarker.OrdinateDimension, DxfClassMap.Create<DimensionOrdinate>());
 							break;
 						default:
 							break;
 					}
+
+					//Registered from the subtype's own type rather than arm by arm, so a subtype added
+					//above cannot silently arrive without the maps its values are looked up in.
+					addDimensionSubclassMaps(map, tmp.CadObject);
 				}
 				return true;
 			//Measurement - read only
@@ -892,7 +888,66 @@ internal abstract class DxfSectionReaderBase
 					this.currentSubclass = tmp.CadObject.SubclassMarker;
 				}
 
-				return this.tryAssignCurrentValue(template.CadObject, map);
+				if (this.tryAssignCurrentValue(template.CadObject, map))
+				{
+					return true;
+				}
+
+				return this.tryAssignLegacyDimensionValue(tmp.CadObject, map);
+		}
+	}
+
+	/// <summary>
+	/// Assigns a value a pre-R13 DIMENSION declares on one of its subtype's subclasses.
+	/// </summary>
+	/// <remarks>
+	/// <para>
+	/// A pre-R13 file carries no <c>100</c> markers, so <see cref="currentSubclass"/> is fixed by
+	/// the first value that reaches the default arm - and that is group code 10, which arrives
+	/// before the group code 70 that says which subtype this is. It is therefore always
+	/// <c>AcDbDimension</c>, the placeholder's, and every 13/14/15/16, 40 and 52 is looked up in a
+	/// map that does not hold it and silently dropped.
+	/// </para>
+	/// <para>
+	/// Moving <see cref="currentSubclass"/> at code 70 does not fix it: a linear dimension
+	/// declares its two points on <c>AcDbAlignedDimension</c> and its rotation on
+	/// <c>AcDbRotatedDimension</c>, so no single marker covers it. The codes are unambiguous
+	/// instead - no DXF code is declared on more than one subclass of any dimension type - so the
+	/// subtype's own maps are searched rather than named. <see cref="currentSubclass"/> is left
+	/// where it is and tried first, so a code the base map owns still resolves there.
+	/// </para>
+	/// </remarks>
+	private bool tryAssignLegacyDimensionValue(CadObject dimension, DxfMap map)
+	{
+		if (this._builder.Version >= ACadVersion.AC1012)
+		{
+			return false;
+		}
+
+		foreach (KeyValuePair<string, DxfClassMap> subclass in map.SubClasses)
+		{
+			if (subclass.Key.Equals(this.currentSubclass, StringComparison.OrdinalIgnoreCase))
+			{
+				continue;
+			}
+
+			if (this.tryAssignCurrentValue(dimension, subclass.Value))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/// <summary>
+	/// Registers every subclass map the object's own type declares.
+	/// </summary>
+	private static void addDimensionSubclassMaps(DxfMap map, CadObject dimension)
+	{
+		foreach (KeyValuePair<string, DxfClassMap> subclass in DxfMap.Create(dimension.GetType()).SubClasses)
+		{
+			map.SubClasses.TryAdd(subclass.Key, subclass.Value);
 		}
 	}
 
