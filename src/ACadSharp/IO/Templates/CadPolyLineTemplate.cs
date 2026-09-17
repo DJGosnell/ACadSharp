@@ -1,6 +1,5 @@
 ﻿using ACadSharp.Entities;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace ACadSharp.IO.Templates
 {
@@ -62,10 +61,10 @@ namespace ACadSharp.IO.Templates
 			switch (this.CadObject)
 			{
 				case Polyline2D pline2d:
-					pline2d.Vertices.AddRange(vertices.Cast<Vertex2D>());
+					this.addVerticesOfType(builder, pline2d.Vertices, vertices);
 					break;
 				case Polyline3D pline3d:
-					pline3d.Vertices.AddRange(vertices.Cast<Vertex3D>());
+					this.addVerticesOfType(builder, pline3d.Vertices, vertices);
 					break;
 				case PolyfaceMesh mesh:
 					foreach (var item in vertices)
@@ -74,11 +73,44 @@ namespace ACadSharp.IO.Templates
 					}
 					break;
 				case PolygonMesh polygon:
-					polygon.Vertices.AddRange(vertices.Cast<PolygonMeshVertex>());
+					this.addVerticesOfType(builder, polygon.Vertices, vertices);
 					break;
 				default:
 					builder.Notify($"Unknown polyline type {this.CadObject.SubclassMarker}", NotificationType.Warning);
 					break;
+			}
+		}
+
+		/// <summary>
+		/// Adds the vertices this collection can hold and reports the rest.
+		/// </summary>
+		/// <remarks>
+		/// A record may name a vertex subclass that contradicts the one its POLYLINE named - a
+		/// VERTEX marked <c>AcDb2dVertex</c> inside a POLYLINE marked <c>AcDb3dPolyline</c>. The
+		/// collection was reached by a <c>Cast&lt;T&gt;</c>, which throws <c>InvalidCastException</c>
+		/// on the first such vertex; and this runs from <see cref="build"/>, inside
+		/// <c>CadDocumentBuilder</c>'s template loop, which has no failsafe of its own. So one
+		/// contradictory record cost the whole document rather than itself, on both readers.
+		/// Reporting and dropping what does not fit is what every other arm of this class already
+		/// does - this method's own <c>default:</c>, <see cref="SetSeqend"/>'s,
+		/// <see cref="addPolyfaceMeshVertex"/>'s final <c>else</c>, and <see cref="build"/>'s
+		/// "not found".
+		/// </remarks>
+		private void addVerticesOfType<T>(CadDocumentBuilder builder, SeqendCollection<T> collection, IEnumerable<Entity> vertices)
+			where T : CadObject
+		{
+			foreach (Entity vertex in vertices)
+			{
+				if (vertex is T fits)
+				{
+					collection.Add(fits);
+				}
+				else
+				{
+					builder.Notify(
+						$"Vertex {vertex.Handle} is a {vertex.GetType().Name}, which a {this.CadObject.GetType().Name} cannot hold; it is not added to polyline {this.CadObject.Handle}",
+						NotificationType.Warning);
+				}
 			}
 		}
 
