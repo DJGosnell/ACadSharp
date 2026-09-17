@@ -38,6 +38,12 @@ internal partial class DwgObjectWriter : DwgSectionIO
 
 	private readonly Dictionary<BlockRecord, Entity[]> _blockCompatibleEntities = new();
 
+	/// <summary>
+	/// Color book entries already reported as unwritable, so one swatch is reported once however
+	/// many entities referenced it.
+	/// </summary>
+	private readonly HashSet<BookColor> _colorlessBookColorsReported = new();
+
 	private CadDocument _document;
 
 	private ILookup<string, Insert> _insertsByBlockName;
@@ -910,13 +916,15 @@ internal partial class DwgObjectWriter : DwgSectionIO
 		}
 
 		//Color	CMC(B)	62
-		this._writer.WriteEnColor(entity.Color, entity.Transparency, entity.BookColor != null);
+		BookColor bookColor = this.bookColorReferenceFor(entity);
+
+		this._writer.WriteEnColor(entity.Color, entity.Transparency, bookColor != null);
 
 		//R2004+:
-		if ((this._version >= ACadVersion.AC1018) && entity.BookColor != null)
+		if ((this._version >= ACadVersion.AC1018) && bookColor != null)
 		{
 			//[Color book color handle (hard pointer)]
-			this._writer.HandleReference(DwgReferenceType.HardPointer, entity.BookColor);
+			this._writer.HandleReference(DwgReferenceType.HardPointer, bookColor);
 		}
 
 		//Ltype scale	BD	48
@@ -1009,6 +1017,65 @@ internal partial class DwgObjectWriter : DwgSectionIO
 		//R2000+:
 		//Lineweight RC 370
 		this._writer.WriteByte(CadUtils.ToIndex(entity.LineWeight));
+	}
+
+	/// <summary>
+	/// The color book entry to reference from <paramref name="entity"/>, or null when there is none
+	/// this container can honestly record.
+	/// </summary>
+	/// <remarks>
+	/// A swatch that names no color (<see cref="BookColor.NamesAColor"/>) has no encoding here.
+	/// <see cref="writeBookColor"/> serialises the swatch's R, G and B under a fixed true-color flag
+	/// byte, and a sentinel's three components are the index table's dummy row {0,0,0} - so writing
+	/// it would produce a file that positively names black, which on the way back in is
+	/// indistinguishable from a book color someone chose to be black. <see cref="skipEntry"/> refuses
+	/// to write such a swatch at all for the same reason; this drops the reference that would
+	/// otherwise dangle, and leaves the entity its own color, which is what it already resolves to.
+	/// <para>
+	/// R2004+ only, matching <see cref="skipEntry"/>: below it the swatch is written, and
+	/// <see cref="DwgStreamWriterBase.WriteEnColor"/> ignores its <c>isBookColor</c> argument and the
+	/// hard pointer is never emitted, so keeping the reference and dropping it produce the same
+	/// bytes. There is nothing to drop.
+	/// </para>
+	/// <para>
+	/// Silent, because <see cref="skipEntry"/> has already named the swatch. Every swatch an entity
+	/// can reference is in <c>Document.Colors</c> - <see cref="Entity.BookColor"/>'s setter puts it
+	/// there - so the object pass sees all of them and reporting here as well only repeats it.
+	/// </para>
+	/// <para>
+	/// DXF needs no equivalent: a DBCOLOR carrying group code 430 and neither 62 nor 420 is exactly
+	/// what a swatch that names no color looks like, so that container writes it back unchanged.
+	/// </para>
+	/// </remarks>
+	private BookColor bookColorReferenceFor(Entity entity)
+	{
+		if (entity.BookColor == null || entity.BookColor.NamesAColor || !this.R2004Plus)
+		{
+			return entity.BookColor;
+		}
+
+		return null;
+	}
+
+	/// <summary>
+	/// Names <paramref name="color"/> as a swatch this file could not carry - once, however many
+	/// entities referenced it and however many passes reach it.
+	/// </summary>
+	/// <remarks>
+	/// A drawing whose thousand entities share one malformed swatch has lost one thing, and the
+	/// notification becomes a list a caller enumerates and quotes the length of. The set is what makes
+	/// that true: <see cref="skipEntry"/> is asked about each dictionary entry more than once - twice
+	/// from <see cref="writeDictionary"/> and again from <c>writeObject</c> - so without it one swatch
+	/// would be named three times.
+	/// </remarks>
+	private void reportColorlessBookColor(BookColor color)
+	{
+		if (this._colorlessBookColorsReported.Add(color))
+		{
+			this.notify(
+				$"Color book entry '{color.Name}' names no color and was not written; any entity referencing it keeps its own color. fullname: {typeof(BookColor).FullName}",
+				NotificationType.Warning);
+		}
 	}
 
 	private void writeEntries<T>(Table<T> table)
