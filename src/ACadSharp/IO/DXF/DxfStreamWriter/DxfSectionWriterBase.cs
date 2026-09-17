@@ -201,11 +201,15 @@ internal abstract partial class DxfSectionWriterBase
 
 		this._writer.Write(6, entity.LineType.Name);
 
-		if (entity.BookColor != null)
+		//A book color is the entity's color, so 62 and 420 carry the swatch rather than the entity's
+		//own value - unless the swatch names no color (see BookColor.NamesAColor), in which case its
+		//components are the index table's dummy row and taking them would write the entity black. The
+		//reference is still written: an entity with its own color beside a 430 pointing at a swatch
+		//that names none is the shape the file had on the way in, and the reader declines the swatch.
+		if (entity.BookColor != null && entity.BookColor.NamesAColor)
 		{
 			this._writer.Write(62, entity.BookColor.Color.GetApproxIndex());
 			this._writer.WriteTrueColor(420, entity.BookColor.Color);
-			this._writer.Write(430, entity.BookColor.Name);
 		}
 		else if (entity.Color.IsTrueColor)
 		{
@@ -214,6 +218,11 @@ internal abstract partial class DxfSectionWriterBase
 		else
 		{
 			this._writer.Write(62, entity.Color.Index);
+		}
+
+		if (entity.BookColor != null)
+		{
+			this._writer.Write(430, entity.BookColor.Name);
 		}
 
 		if (entity.Transparency.Value >= 0)
