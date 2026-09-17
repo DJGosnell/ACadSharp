@@ -145,6 +145,12 @@ internal partial class DwgObjectWriter : DwgSectionIO
 		{
 			case UnknownEntity:
 				return false;
+			case Seqend:
+				//A SEQEND is written as part of the POLYLINE or INSERT that owns it - writeEntity emits it
+				//from the owner's own arm - so one reached standalone is a duplicate, not a loss, and it
+				//is declined without a notification. Pre-R13 files put SEQEND in the entity list, which is
+				//the only way one arrives here; writeEntity's default arm used to throw on it.
+				return false;
 			case Shape:
 				return this.WriteShapes;
 			case TableEntity when !this.R2010Plus:
