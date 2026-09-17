@@ -1054,19 +1054,22 @@ internal abstract class DxfSectionReaderBase
 
 	private CadEntityTemplate readLegacyPolyline()
 	{
-		var polyline = new Polyline2D();
-		CadPolyLineTemplate template = new CadPolyLineTemplate(polyline);
+		//Seeding a Polyline2D is what pre-R13 means: a genuine R12 record carries no 100 codes at
+		//all, so the object has to exist before the record is read and there is nothing else it
+		//could be. What the seed may not be is a reference anything below keeps - a record that
+		//does carry a marker naming a different type makes readPolyline's arm call
+		//SetPolyLineObject, and from that point the seed is an orphan. Vertices and the seqend go
+		//onto template.CadObject, whatever the record turned it into.
+		CadPolyLineTemplate template = new CadPolyLineTemplate(new Polyline2D());
 		this.readEntityCodes<Polyline2D>(template, this.readPolyline);
 
 		while (this._reader.Code == 0 && this._reader.ValueAsString == DxfFileToken.EntityVertex)
 		{
-			Vertex2D v = new Vertex2D();
-			CadVertexTemplate vertexTemplate = new CadVertexTemplate(v);
-			this.readEntityCodes<Vertex2D>(vertexTemplate, this.readVertex);
+			CadVertexTemplate vertexTemplate = this.readLegacyVertex(template.CadObject);
 
 			if (vertexTemplate.Vertex.Handle == 0)
 			{
-				polyline.Vertices.Add(v);
+				template.AddVertices(this._builder, vertexTemplate.Vertex);
 			}
 			else
 			{
@@ -1081,10 +1084,44 @@ internal abstract class DxfSectionReaderBase
 			var seqendTemplate = new CadEntityTemplate<Seqend>(seqend);
 			this.readEntityCodes<Seqend>(seqendTemplate, this.readEntitySubclassMap);
 
-			polyline.Vertices.Seqend = seqend;
+			template.SetSeqend(this._builder, seqend);
 		}
 
 		return template;
+	}
+
+	/// <summary>
+	/// Reads one pre-R13 VERTEX, seeded with the vertex type the POLYLINE record declared itself to
+	/// hold.
+	/// </summary>
+	/// <remarks>
+	/// The same reasoning as the seed in <see cref="readLegacyPolyline"/>, one level down, and the
+	/// half of it that cannot be deferred: by the time a VERTEX is reached the POLYLINE has said
+	/// what it is, so a producer that marks the POLYLINE and not its VERTEXes - which a pre-R13
+	/// file that carries 100 codes at all may well be - is asking for the type named above. Reading
+	/// such a file as Vertex2D put a Vertex2D into a Polyline3D, which
+	/// <see cref="CadPolyLineTemplate.AddVertices"/> could not collect.
+	/// </remarks>
+	private CadVertexTemplate readLegacyVertex(Entity polyline)
+	{
+		//A polyface mesh's stream is a mix of AcDbPolyFaceMeshVertex and AcDbFaceRecord records
+		//told apart only by their marker, so the seed can only be the one the mesh is mostly made
+		//of; a record carrying the face marker is corrected by readVertex's arm as before.
+		switch (polyline)
+		{
+			case Polyline3D:
+				return (CadVertexTemplate)this.readEntityCodes<Vertex3D>(
+					new CadVertexTemplate(new Vertex3D()), this.readVertex);
+			case PolyfaceMesh:
+				return (CadVertexTemplate)this.readEntityCodes<VertexFaceMesh>(
+					new CadVertexTemplate(new VertexFaceMesh()), this.readVertex);
+			case PolygonMesh:
+				return (CadVertexTemplate)this.readEntityCodes<PolygonMeshVertex>(
+					new CadVertexTemplate(new PolygonMeshVertex()), this.readVertex);
+			default:
+				return (CadVertexTemplate)this.readEntityCodes<Vertex2D>(
+					new CadVertexTemplate(new Vertex2D()), this.readVertex);
+		}
 	}
 
 	private bool readPolyline(CadEntityTemplate template, DxfMap map, string subclass = null)
@@ -1700,10 +1737,10 @@ internal abstract class DxfSectionReaderBase
 				{
 					case DxfSubclassMarker.Vertex:
 						return true;
-					//TryAdd for the same reason as readPolyline's arms: the legacy path reads a
-					//vertex through readEntityCodes<Vertex2D>, whose map already holds
-					//AcDb2dVertex. That is the arm it can reach with the key present; the other
-					//four are uniform with it rather than reachable.
+					//TryAdd for the same reason as readPolyline's arms: the legacy path seeds each
+					//VERTEX with the vertex type its POLYLINE declared and builds the map from
+					//that concrete type, so four of these five arms can be reached with their own
+					//key already present. AcDbFaceRecord is the fifth and is uniform with them.
 					case DxfSubclassMarker.PolylineVertex:
 						tmp.SetVertexObject(new Vertex2D());
 						map.SubClasses.TryAdd(DxfSubclassMarker.PolylineVertex, DxfClassMap.Create<Vertex2D>());
