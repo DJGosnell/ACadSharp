@@ -1,4 +1,6 @@
 ﻿using ACadSharp.Attributes;
+using ACadSharp.IO;
+using System.Collections.Generic;
 using CSMath;
 using CSMath.Extensions;
 using CSMath.Geometry;
@@ -47,6 +49,23 @@ namespace ACadSharp.Entities
 		/// </summary>
 		[DxfCodeValue(13, 23, 33)]
 		public XYZ FirstPoint { get; set; }
+
+		/// <summary>
+		/// Whether <see cref="Measurement"/> can be computed from this dimension's own points.
+		/// </summary>
+		/// <remarks>
+		/// False when either defining vector is zero, which is what a dimension whose subtype points
+		/// are all at the origin gives. <see cref="Measurement"/> throws in that case rather than
+		/// answering, so anything that must have a value asks this first.
+		/// </remarks>
+		public bool IsMeasurable
+		{
+			get
+			{
+				return !(this.SecondPoint - this.FirstPoint).IsZero()
+					&& !(this.DefinitionPoint - this.AngleVertex).IsZero();
+			}
+		}
 
 		/// <inheritdoc/>
 		public override double Measurement
@@ -159,6 +178,27 @@ namespace ACadSharp.Entities
 			var endAngle = XYZ.AxisX.AngleBetweenVectors(this.FirstPoint);
 
 			this._block.Entities.Add(new Arc(this.Center, this.Offset, startAngle, endAngle));
+		}
+
+		/// <inheritdoc/>
+		/// <remarks>
+		/// A DWG writes the actual measurement as a field of its own (group 42, "Actual Measurement"),
+		/// so a dimension that cannot supply one cannot be written to that container. DXF is not
+		/// affected and is deliberately left alone: group 42 is read-only there, no DXF writer asks for
+		/// <see cref="Measurement"/>, and a pre-R13 drawing saved back as DXF keeps every dimension it
+		/// arrived with.
+		/// </remarks>
+		public override bool IsValid(CadFileFormat format, ACadVersion version, out IList<string> errors)
+		{
+			bool result = base.IsValid(format, version, out errors);
+
+			if (format == CadFileFormat.DWG && !this.IsMeasurable)
+			{
+				errors.Add("Measurement cannot be computed: the vectors it is measured between are zero.");
+				result = false;
+			}
+
+			return result;
 		}
 	}
 }
