@@ -26,6 +26,17 @@ internal abstract class DxfSectionReaderBase
 	protected bool lockPointer = false;
 	protected string currentSubclass = null;
 
+	/// <summary>
+	/// The subtype bits of a DIMENSION's group code 70, without the modifier flags.
+	/// </summary>
+	/// <remarks>
+	/// <see cref="DimensionType"/> is a flag enum, but only <c>BlockReference</c> (32),
+	/// <c>OrdinateTypeX</c> (64) and <c>TextUserDefinedLocation</c> (128) are flags. The values
+	/// below them, <c>Linear</c> (0) through <c>Ordinate</c> (6), are an enumeration packed into
+	/// the same word, and a dimension of any subtype may carry any of the three modifiers.
+	/// </remarks>
+	private const DimensionType DimensionTypeMask = (DimensionType)0x07;
+
 	public DxfSectionReaderBase(IDxfStreamReader reader, DxfDocumentBuilder builder)
 	{
 		this._reader = reader;
@@ -784,7 +795,10 @@ internal abstract class DxfSectionReaderBase
 
 				if (tmp.CadObject is CadDimensionTemplate.DimensionPlaceholder placeholder && this._builder.Version < ACadVersion.AC1012)
 				{
-					switch (placeholder.Flags)
+					//The subtype is the low three bits and nothing else. Switching on the whole word leaves
+					//a record carrying any modifier matching no arm at all - it keeps the placeholder and is
+					//then discarded by readEntity as having no subtype, losing the dimension outright.
+					switch (placeholder.Flags & DimensionTypeMask)
 					{
 						case DimensionType.Linear:
 							tmp.SetDimensionObject(new DimensionLinear());
@@ -812,13 +826,9 @@ internal abstract class DxfSectionReaderBase
 							map.SubClasses.TryAdd(DxfSubclassMarker.Angular3PointDimension, DxfClassMap.Create<DimensionAngular3Pt>());
 							break;
 						case DimensionType.Ordinate:
-						case DimensionType.OrdinateTypeX:
-						case DimensionType.Ordinate | DimensionType.OrdinateTypeX:
 							tmp.SetDimensionObject(new DimensionOrdinate());
 							map.SubClasses.TryAdd(DxfSubclassMarker.OrdinateDimension, DxfClassMap.Create<DimensionOrdinate>());
 							break;
-						case DimensionType.BlockReference:
-						case DimensionType.TextUserDefinedLocation:
 						default:
 							break;
 					}
