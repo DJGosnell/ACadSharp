@@ -1,4 +1,4 @@
-using ACadSharp.Header;
+﻿using ACadSharp.Header;
 using ACadSharp.IO.DWG;
 using System.IO;
 using System.Text;
@@ -113,6 +113,8 @@ public class DwgHeaderFlagsTests : DwgSectionWriterTestBase
 	[InlineData(1, 1)]
 	[InlineData(2, 2)]
 	[InlineData(3, 3)]
+	[InlineData(1, 2)]
+	[InlineData(3, 1)]
 	public void EveryEndCapsAndJoinStyleValueSurvivesTheRoundTrip(short endCaps, short joinStyle)
 	{
 		CadHeader read = roundTrip(ACadVersion.AC1032, h =>
@@ -194,6 +196,76 @@ public class DwgHeaderFlagsTests : DwgSectionWriterTestBase
 		Assert.Equal((short)0, read.EndCaps);
 		Assert.Equal((short)0, read.JoinStyle);
 		Assert.True(read.DisplayLineWeight);
+	}
+
+	/// <summary>
+	/// A value outside a field's own bit width stays inside it, and its neighbours are unaffected.
+	/// </summary>
+	/// <remarks>
+	/// ENDCAPS owns two bits at 0x0060 and JOINSTYLE two at 0x0180, and the object model holds both
+	/// as a plain short that any reader can fill from a file - DXF carries them in group code 280
+	/// with no range check. Shifted without a mask, 4 becomes 0x80 for ENDCAPS and 0x200 for
+	/// JOINSTYLE, and 0x200 is LWDISPLAY's bit, so writing a JOINSTYLE of 4 would silently invert a
+	/// variable that has nothing to do with it.
+	/// <para>
+	/// Every neighbour is asserted against the value it was written with, not against its legal
+	/// range. A mask one bit too wide keeps the overflow inside the pair - ENDCAPS 4 under a 0x7
+	/// mask lands on 0x80, which is JOINSTYLE's low bit - so it produces a neighbour that is still
+	/// in range and merely wrong, and a range assertion cannot see it.
+	/// </para>
+	/// </remarks>
+	[Theory]
+	[InlineData(4, 0)]
+	[InlineData(16, 0)]
+	[InlineData(0, 4)]
+	[InlineData(0, 16)]
+	[InlineData(4, 2)]
+	[InlineData(2, 4)]
+	public void AnOutOfRangeCapOrJoinValueDisturbsNoNeighbouringField(short endCaps, short joinStyle)
+	{
+		CadHeader read = roundTrip(ACadVersion.AC1032, h =>
+		{
+			h.EndCaps = endCaps;
+			h.JoinStyle = joinStyle;
+			h.DisplayLineWeight = true;
+			h.XEdit = true;
+			h.ExtendedNames = false;
+			h.LoadOLEObject = false;
+			h.CurrentEntityLineWeight = LineWeightType.W211;
+		});
+
+		Assert.True(read.DisplayLineWeight);
+		Assert.True(read.XEdit);
+		Assert.False(read.ExtendedNames);
+		Assert.False(read.LoadOLEObject);
+		Assert.Equal(LineWeightType.W211, read.CurrentEntityLineWeight);
+
+		// Each field keeps its own two bits and nothing else, so the neighbour is exactly what it
+		// was written with even when the other field overflowed.
+		Assert.Equal((short)(endCaps & 0x3), read.EndCaps);
+		Assert.Equal((short)(joinStyle & 0x3), read.JoinStyle);
+	}
+
+	/// <summary>
+	/// The single case that names the collision directly, because it is the one that matters: a
+	/// JOINSTYLE of 4 lands exactly on LWDISPLAY's bit.
+	/// </summary>
+	[Fact]
+	public void AnOutOfRangeJoinStyleDoesNotInvertLwDisplay()
+	{
+		CadHeader spilled = roundTrip(ACadVersion.AC1032, h =>
+		{
+			h.JoinStyle = 4;
+			h.DisplayLineWeight = true;
+		});
+		CadHeader control = roundTrip(ACadVersion.AC1032, h =>
+		{
+			h.JoinStyle = 0;
+			h.DisplayLineWeight = true;
+		});
+
+		Assert.True(control.DisplayLineWeight);
+		Assert.True(spilled.DisplayLineWeight);
 	}
 
 	/// <summary>

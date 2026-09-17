@@ -866,9 +866,9 @@ namespace ACadSharp.IO.DWG
 				//CELWEIGHT Flags & 0x001F
 				int flags = (CadUtils.ToIndex(this._header.CurrentEntityLineWeight) & 0x1F) |
 							//ENDCAPS Flags & 0x0060
-							(this._header.EndCaps << 0x5) |
+							((this._header.EndCaps & 0x3) << 0x5) |
 							//JOINSTYLE Flags & 0x0180
-							(this._header.JoinStyle << 0x7);
+							((this._header.JoinStyle & 0x3) << 0x7);
 
 				//LWDISPLAY!(Flags & 0x0200)
 				if (!this._header.DisplayLineWeight)
