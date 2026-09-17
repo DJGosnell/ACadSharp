@@ -1103,21 +1103,27 @@ internal abstract class DxfSectionReaderBase
 			case 100:
 				switch (this._reader.ValueAsString)
 				{
+					//TryAdd, not Add: the legacy (pre-R13) path below builds the map from the
+					//concrete Polyline2D, so it already holds AcDb2dPolyline. A pre-R13 file that
+					//does carry subclass markers - which is what this library's own DXF writer
+					//emits at AC1009 - would otherwise throw a duplicate-key ArgumentException
+					//here, and the section reader's failsafe would drop the polyline, its
+					//vertices and its seqend without the caller hearing anything.
 					case DxfSubclassMarker.Polyline:
 						tmp.SetPolyLineObject(new Polyline2D());
-						map.SubClasses.Add(DxfSubclassMarker.Polyline, DxfClassMap.Create<Polyline2D>());
+						map.SubClasses.TryAdd(DxfSubclassMarker.Polyline, DxfClassMap.Create<Polyline2D>());
 						return true;
 					case DxfSubclassMarker.Polyline3d:
 						tmp.SetPolyLineObject(new Polyline3D());
-						map.SubClasses.Add(DxfSubclassMarker.Polyline3d, DxfClassMap.Create<Polyline3D>());
+						map.SubClasses.TryAdd(DxfSubclassMarker.Polyline3d, DxfClassMap.Create<Polyline3D>());
 						return true;
 					case DxfSubclassMarker.PolyfaceMesh:
 						tmp.SetPolyLineObject(new PolyfaceMesh());
-						map.SubClasses.Add(DxfSubclassMarker.PolyfaceMesh, DxfClassMap.Create<PolyfaceMesh>());
+						map.SubClasses.TryAdd(DxfSubclassMarker.PolyfaceMesh, DxfClassMap.Create<PolyfaceMesh>());
 						return true;
 					case DxfSubclassMarker.PolygonMesh:
 						tmp.SetPolyLineObject(new PolygonMesh());
-						map.SubClasses.Add(DxfSubclassMarker.PolygonMesh, DxfClassMap.Create<PolygonMesh>());
+						map.SubClasses.TryAdd(DxfSubclassMarker.PolygonMesh, DxfClassMap.Create<PolygonMesh>());
 						return true;
 					default:
 						return false;
@@ -1690,25 +1696,28 @@ internal abstract class DxfSectionReaderBase
 				{
 					case DxfSubclassMarker.Vertex:
 						return true;
+					//TryAdd for the same reason as readPolyline's arms: the legacy path reads a
+					//vertex through readEntityCodes<Vertex2D>, whose map already holds
+					//AcDb2dVertex.
 					case DxfSubclassMarker.PolylineVertex:
 						tmp.SetVertexObject(new Vertex2D());
-						map.SubClasses.Add(DxfSubclassMarker.PolylineVertex, DxfClassMap.Create<Vertex2D>());
+						map.SubClasses.TryAdd(DxfSubclassMarker.PolylineVertex, DxfClassMap.Create<Vertex2D>());
 						return true;
 					case DxfSubclassMarker.Polyline3dVertex:
 						tmp.SetVertexObject(new Vertex3D());
-						map.SubClasses.Add(DxfSubclassMarker.Polyline3dVertex, DxfClassMap.Create<Vertex3D>());
+						map.SubClasses.TryAdd(DxfSubclassMarker.Polyline3dVertex, DxfClassMap.Create<Vertex3D>());
 						return true;
 					case DxfSubclassMarker.PolyfaceMeshVertex:
 						tmp.SetVertexObject(new VertexFaceMesh());
-						map.SubClasses.Add(DxfSubclassMarker.PolyfaceMeshVertex, DxfClassMap.Create<VertexFaceMesh>());
+						map.SubClasses.TryAdd(DxfSubclassMarker.PolyfaceMeshVertex, DxfClassMap.Create<VertexFaceMesh>());
 						return true;
 					case DxfSubclassMarker.PolyfaceMeshFace:
 						tmp.SetVertexObject(new VertexFaceRecord());
-						map.SubClasses.Add(DxfSubclassMarker.PolyfaceMeshFace, DxfClassMap.Create<VertexFaceRecord>());
+						map.SubClasses.TryAdd(DxfSubclassMarker.PolyfaceMeshFace, DxfClassMap.Create<VertexFaceRecord>());
 						return true;
 					case DxfSubclassMarker.PolygonMeshVertex:
 						tmp.SetVertexObject(new PolygonMeshVertex());
-						map.SubClasses.Add(DxfSubclassMarker.PolygonMeshVertex, DxfClassMap.Create<PolygonMeshVertex>());
+						map.SubClasses.TryAdd(DxfSubclassMarker.PolygonMeshVertex, DxfClassMap.Create<PolygonMeshVertex>());
 						return true;
 					default:
 						return false;
