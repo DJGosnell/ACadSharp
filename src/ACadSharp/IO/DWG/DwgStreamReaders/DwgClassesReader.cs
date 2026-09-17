@@ -61,14 +61,18 @@ internal class DwgClassesReader : DwgSectionIO
 			textReader.SetPositionInBits(endSection);
 
 			this._sreader = new DwgMergedReader(this._sreader, textReader, null);
-
-			//BL: 0x00
-			this._sreader.ReadBitLong();
-			//B : flag - to find the data string at the end of the section
-			this._sreader.ReadBit();
 		}
 
-		if (this._fileHeader.AcadVersion == ACadVersion.AC1018)
+		//R2004+:
+		//Read with the codes the writer used, at every version the writer writes them. This block was
+		//previously read only when the version was exactly AC1018, and R2007+ read a BL and a B in its
+		//place. The two shapes agree by accident: a BS whose value needs its 16-bit form costs
+		//2 + 16 bits, so BS + RC + RC + B is 35 bits, and BL + B is 2 + 32 + 1 = 35. Class numbers are
+		//assigned from 500 up, so every table that holds a class takes that form and decoded correctly.
+		//An *empty* table makes the maximum class number 0, a BS of 0 is the two-bit zero code, and the
+		//reader then consumed 3 bits where the writer wrote 19 - leaving 16 bits of padding to be read
+		//as the start of a class, and ReadVariableText to overflow on the length it found there.
+		if (this.R2004Plus)
 		{
 			//BS : Maximum class number
 			this._sreader.ReadBitShort();
