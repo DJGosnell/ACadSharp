@@ -16,6 +16,15 @@ namespace ACadSharp.IO.Templates
 
 		internal void SetVertexObject(Vertex vertex)
 		{
+			//Same guard, and the same reason, as CadPolyLineTemplate.SetPolyLineObject: the pre-R13
+			//reader creates the Vertex2D itself and keeps the reference it hands to the polyline,
+			//so swapping in a second instance of the same type leaves that reference holding a
+			//vertex nothing ever read into.
+			if (this.CadObject.GetType() == vertex.GetType())
+			{
+				return;
+			}
+
 			vertex.Handle = this.CadObject.Handle;
 			vertex.Owner = this.CadObject.Owner;
 
