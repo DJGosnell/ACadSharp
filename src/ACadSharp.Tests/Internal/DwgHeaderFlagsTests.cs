@@ -8,15 +8,16 @@ using Xunit.Abstractions;
 namespace ACadSharp.Tests.Internal;
 
 /// <summary>
-/// The R2000+ header section packs eight variables into one BL "Flags" value. These pin each field
-/// that is not CELWEIGHT through a real write and read.
+/// The R2000+ header section packs eight variables into one BL "Flags" value. These pin each of
+/// them through a real write and read.
 /// </summary>
 /// <remarks>
-/// Two of them are stored inverted - the field list writes LWDISPLAY and XEDIT with a leading "!" -
-/// and three of them sit above bit 0, so a decode that forgets either detail still produces a value
-/// and never throws. The values below are chosen so that a forgotten shift is visible: EndCaps 2
-/// occupies 0x40 and JoinStyle 3 occupies 0x180, so reading the mask without shifting it down
-/// answers 64 and 384 rather than 2 and 3, and PlotStyleMode 1 answers 8192 rather than 1.
+/// Two are stored inverted - the field list writes LWDISPLAY and XEDIT with a leading "!" - three
+/// sit above bit 0, and CELWEIGHT is a 5-bit index into the lineweight table rather than the
+/// LineWeightType value itself. A decode that forgets any of those still produces a value and never
+/// throws. The values below are chosen so that a forgotten shift is visible: EndCaps 2 occupies
+/// 0x40 and JoinStyle 3 occupies 0x180, so reading the mask without shifting it down answers 64 and
+/// 384 rather than 2 and 3, and PlotStyleMode 1 answers 8192 rather than 1.
 /// </remarks>
 public class DwgHeaderFlagsTests : DwgSectionWriterTestBase
 {
@@ -140,5 +141,81 @@ public class DwgHeaderFlagsTests : DwgSectionWriterTestBase
 
 		Assert.True(read.DisplayLineWeight);
 		Assert.False(read.ExtendedNames);
+	}
+
+	/// <summary>
+	/// CELWEIGHT occupies the low five bits, and it holds a lineweight <em>index</em>.
+	/// </summary>
+	/// <remarks>
+	/// LineWeightType's members are hundredths of a millimetre - W50 is 50 - so the value itself
+	/// does not fit in five bits, and masking it produces a different, legal weight: 50 becomes 18,
+	/// 100 becomes 4 and 211 becomes 19. CadUtils.ToIndex and CadUtils.ToValue are the converters
+	/// the DWG object and table readers already use for an entity's and a layer's lineweight, and
+	/// they carry the three sentinels (29 ByLayer, 30 ByBlock, 31 Default) as well.
+	/// </remarks>
+	[Theory]
+	[InlineData(LineWeightType.ByLayer)]
+	[InlineData(LineWeightType.ByBlock)]
+	[InlineData(LineWeightType.Default)]
+	[InlineData(LineWeightType.W0)]
+	[InlineData(LineWeightType.W25)]
+	[InlineData(LineWeightType.W50)]
+	[InlineData(LineWeightType.W100)]
+	[InlineData(LineWeightType.W211)]
+	public void EveryCurrentEntityLineWeightSurvivesTheRoundTrip(LineWeightType weight)
+	{
+		CadHeader read = roundTrip(ACadVersion.AC1032, h => h.CurrentEntityLineWeight = weight);
+
+		Assert.Equal(weight, read.CurrentEntityLineWeight);
+	}
+
+	/// <summary>
+	/// A weight the index table does not contain becomes Default, and takes no bit outside the
+	/// five the field owns.
+	/// </summary>
+	/// <remarks>
+	/// CadUtils.ToIndex answers 255 for a value it cannot place - Array.IndexOf returns -1 and the
+	/// cast to byte wraps - so the field has to be masked on the way in. Unmasked, those bits would
+	/// land on ENDCAPS, JOINSTYLE and LWDISPLAY, which is why this asserts them as well as the
+	/// weight. Masked, 255 becomes 31, and 31 is the index ToValue already reads as Default.
+	/// </remarks>
+	[Fact]
+	public void AWeightOutsideTheIndexTableBecomesDefaultAndDisturbsNothingElse()
+	{
+		CadHeader read = roundTrip(ACadVersion.AC1032, h =>
+		{
+			h.CurrentEntityLineWeight = (LineWeightType)999;
+			h.EndCaps = 0;
+			h.JoinStyle = 0;
+			h.DisplayLineWeight = true;
+		});
+
+		Assert.Equal(LineWeightType.Default, read.CurrentEntityLineWeight);
+		Assert.Equal((short)0, read.EndCaps);
+		Assert.Equal((short)0, read.JoinStyle);
+		Assert.True(read.DisplayLineWeight);
+	}
+
+	/// <summary>
+	/// CELWEIGHT shares its bit long with the seven fields above, so a decode that is right on its
+	/// own can still be wrong beside them.
+	/// </summary>
+	[Fact]
+	public void CelWeightIsDecodedBesideTheOtherFields()
+	{
+		CadHeader read = roundTrip(ACadVersion.AC1032, h =>
+		{
+			h.CurrentEntityLineWeight = LineWeightType.W211;
+			h.EndCaps = 3;
+			h.JoinStyle = 2;
+			h.PlotStyleMode = 1;
+			h.DisplayLineWeight = true;
+		});
+
+		Assert.Equal(LineWeightType.W211, read.CurrentEntityLineWeight);
+		Assert.Equal((short)3, read.EndCaps);
+		Assert.Equal((short)2, read.JoinStyle);
+		Assert.Equal((short)1, read.PlotStyleMode);
+		Assert.True(read.DisplayLineWeight);
 	}
 }
