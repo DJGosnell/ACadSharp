@@ -1742,9 +1742,12 @@ internal abstract class DxfSectionReaderBase
 					case DxfSubclassMarker.Vertex:
 						return true;
 					//TryAdd for the same reason as readPolyline's arms: the legacy path seeds each
-					//VERTEX with the vertex type its POLYLINE declared and builds the map from
-					//that concrete type, so four of these five arms can be reached with their own
-					//key already present. AcDbFaceRecord is the fifth and is uniform with them.
+					//VERTEX with the vertex type its POLYLINE declared - where that determines it -
+					//and builds the map from that concrete type, so AcDb2dVertex, AcDb3dPolylineVertex
+					//and AcDbPolygonMeshVertex can each be reached with their own key already
+					//present. The two polyface arms cannot: readLegacyVertex deliberately does not
+					//seed that family, because its stream mixes them. They are uniform with the
+					//other three rather than reachable.
 					case DxfSubclassMarker.PolylineVertex:
 						tmp.SetVertexObject(new Vertex2D());
 						map.SubClasses.TryAdd(DxfSubclassMarker.PolylineVertex, DxfClassMap.Create<Vertex2D>());
