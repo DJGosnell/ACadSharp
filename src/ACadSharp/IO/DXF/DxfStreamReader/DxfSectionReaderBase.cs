@@ -1104,17 +1104,21 @@ internal abstract class DxfSectionReaderBase
 	/// </remarks>
 	private CadVertexTemplate readLegacyVertex(Entity polyline)
 	{
-		//A polyface mesh's stream is a mix of AcDbPolyFaceMeshVertex and AcDbFaceRecord records
-		//told apart only by their marker, so the seed can only be the one the mesh is mostly made
-		//of; a record carrying the face marker is corrected by readVertex's arm as before.
+		//Only where the polyline's type determines the vertex's. Polyline3D and PolygonMesh hold
+		//exactly one kind of vertex each, so naming the polyline names the vertex. A PolyfaceMesh
+		//does not: its stream mixes AcDbPolyFaceMeshVertex and AcDbFaceRecord records, and with no
+		//marker on the record the only thing separating them is bit 64 of group code 70 - which
+		//this method cannot see, because it has to choose before the record is read. Seeding
+		//VertexFaceMesh there would file an unmarked FACE record as a phantom vertex at (0,0,0)
+		//with its 71-74 indices dropped and nothing reported, which is worse than the Vertex2D
+		//seed's outcome: declined by addPolyfaceMeshVertex, and said out loud. So a polyface mesh
+		//keeps the Vertex2D seed and relies on its markers, and an unmarked record is reported
+		//rather than guessed at.
 		switch (polyline)
 		{
 			case Polyline3D:
 				return (CadVertexTemplate)this.readEntityCodes<Vertex3D>(
 					new CadVertexTemplate(new Vertex3D()), this.readVertex);
-			case PolyfaceMesh:
-				return (CadVertexTemplate)this.readEntityCodes<VertexFaceMesh>(
-					new CadVertexTemplate(new VertexFaceMesh()), this.readVertex);
 			case PolygonMesh:
 				return (CadVertexTemplate)this.readEntityCodes<PolygonMeshVertex>(
 					new CadVertexTemplate(new PolygonMeshVertex()), this.readVertex);

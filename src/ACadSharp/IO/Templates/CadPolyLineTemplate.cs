@@ -210,7 +210,12 @@ namespace ACadSharp.IO.Templates
 			}
 			else
 			{
-				builder.Notify($"Unidentified type for PolyfaceMesh {e.GetType().FullName}");
+				//Warning, not the parameter's NotificationType.None default: this is the one arm of
+				//this class that declines a record without saying so at a level a consumer filters
+				//on, and it is the arm a pre-R13 polyface mesh whose records carry no subclass
+				//marker lands in. A drop nobody can see is the failure mode the rest of the class
+				//exists to avoid.
+				builder.Notify($"Unidentified type for PolyfaceMesh {e.GetType().FullName}", NotificationType.Warning);
 			}
 		}
 
