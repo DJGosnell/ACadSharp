@@ -40,6 +40,24 @@ internal partial class DwgObjectWriter : DwgSectionIO
 		notify = true;
 		switch (entry)
 		{
+			//A swatch that names no color has no representation here. writeBookColor serialises the
+			//swatch's R, G and B under a fixed true-color flag byte, and a sentinel's three components
+			//are the index table's dummy row {0,0,0}, so writing it would record a swatch that
+			//positively names black; readDbColor rebuilds a true color from that BitLong unconditionally
+			//and never looks at the flag byte, so nothing downstream could undo it.
+			//
+			//R2004+ only, because that is exactly how far that reasoning reaches: writeBookColor emits
+			//no color field at all below it - the whole RGB block is inside the same version check - so
+			//a colorless swatch is not written as black there and there is nothing to refuse. Refusing
+			//anyway would remove a dictionary entry at versions this rule has no argument about.
+			//
+			//Reported here rather than left to writeCommonEntityData, because a swatch no entity
+			//references never reaches that path and would otherwise be dropped in silence. Both sites
+			//report through the same set, so the swatch is named once however it is reached first.
+			case BookColor color when this.R2004Plus && !color.NamesAColor:
+				notify = false;
+				this.reportColorlessBookColor(color);
+				return true;
 			case EvaluationGraph when !this.WriteDynamicParameters:
 			case BlockRepresentationData when !this.WriteDynamicParameters:
 			case DynamicBlockPurgePreventer when !this.WriteDynamicParameters:

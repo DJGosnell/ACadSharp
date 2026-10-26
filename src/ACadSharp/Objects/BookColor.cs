@@ -70,6 +70,23 @@ public class BookColor : NonGraphicalObject, IDxfClassDefined
 	[DxfCodeValue(62, 420)]
 	public Color Color { get; set; }
 
+	/// <summary>
+	/// Whether this swatch names a color at all.
+	/// </summary>
+	/// <remarks>
+	/// A DBCOLOR is only obliged to carry its name: one written with group code 430 and neither 62
+	/// nor 420 leaves <see cref="Color"/> at its default, which is index 0 - ByBlock. ByBlock,
+	/// ByLayer and ByEntity all mean "take the color from somewhere else", and a color book entry
+	/// has nowhere else to take it from, so a swatch holding one of them names nothing.
+	/// <para>
+	/// Worth asking before writing, because <c>Color.GetRgb()</c> answers an index-0 color with the
+	/// index table's dummy row {0,0,0} rather than throwing. A writer that does not ask therefore
+	/// emits the swatch as an explicit black - a color nobody named, and one that cannot be told
+	/// apart on the way back in from a book color someone chose to be black.
+	/// </para>
+	/// </remarks>
+	public bool NamesAColor => this.Color.IsTrueColor || (this.Color.Index > 0 && this.Color.Index < 256);
+
 	/// <inheritdoc/>
 	public BookColor() : base() { }
 
