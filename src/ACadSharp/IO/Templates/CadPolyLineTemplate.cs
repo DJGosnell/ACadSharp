@@ -25,6 +25,18 @@ namespace ACadSharp.IO.Templates
 		public void SetPolyLineObject<T>(Polyline<T> polyLine)
 			where T : Entity, IVertex
 		{
+			//Already the right object: replace it and the caller's own reference is orphaned, along
+			//with everything read into it so far. Two readers depend on this. The pre-R13 reader
+			//creates the Polyline2D itself and adds the vertices and the seqend to that reference,
+			//so a file carrying both subclass markers and handle-less vertices would load an empty
+			//polyline. And a file that repeats a subclass marker would run this twice, keeping only
+			//the six properties copied below and losing the flags and the elevation read between
+			//the two. Same guard, and the same reason, as CadDimensionTemplate.SetDimensionObject.
+			if (this.CadObject.GetType() == polyLine.GetType())
+			{
+				return;
+			}
+
 			polyLine.Handle = this.CadObject.Handle;
 			polyLine.Color = this.CadObject.Color;
 			polyLine.LineWeight = this.CadObject.LineWeight;
