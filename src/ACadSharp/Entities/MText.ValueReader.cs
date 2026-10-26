@@ -158,9 +158,12 @@ namespace ACadSharp.Entities
 				while (true)
 				{
 					var token = spanText[this._position];
+					//Only the codes handled below. Any other %% sequence (%%u, %%o, %%nnn) is literal
+					//text and is read by the plain-text arm one character at a time.
 					if (token == '%'
 					    && this.canAdvance(2)
-					    && spanText[this._position + 1] == '%')
+					    && spanText[this._position + 1] == '%'
+					    && isPercentCode(spanText[this._position + 2]))
 					{
 						this._controlCode = false;
 						token = spanText[this._position + 2];
@@ -181,15 +184,10 @@ namespace ACadSharp.Entities
 							charBufferSpan[0] = '\u00D8';
 							this.flushText(this._charBuffer);
 						}
-						else if (token == '%')
+						else
 						{
 							charBufferSpan[0] = '%';
 							this.flushText(this._charBuffer);
-						}
-						else
-						{
-							this.pushTextEnd();
-							continue;
 						}
 
 						if (this.canAdvance(3))
@@ -205,8 +203,13 @@ namespace ACadSharp.Entities
 					}
 					else if (token == '\\')
 					{
-						if (this._controlCode) 
+						//An escaped backslash is literal text. The pending run before it goes first, or
+						//the backslash lands ahead of the text that preceded it.
+						if (this._controlCode)
+						{
+							this.pushPendingText();
 							this._mainBuffer.Add(this._content.Slice(this._position, 1));
+						}
 
 						this._controlCode = !this._controlCode;
 					}
@@ -828,7 +831,7 @@ namespace ACadSharp.Entities
 				// If there is a gap here, we need to add the range to the list.
 				if (this._textValueEnd != this._position)
 				{
-					this._mainBuffer.Add(this._content.Slice(this._textValueStart, this._position - this._textValueStart - 1));
+					this.pushPendingText();
 					this._textValueStart = this._position;
 					this._textValueEnd = this._position + 1;
 					return;
@@ -837,18 +840,31 @@ namespace ACadSharp.Entities
 				this._textValueEnd++;
 			}
 
+			/// <summary>
+			/// Moves the pending text range into the buffer, without flushing it to the visitor.
+			/// </summary>
+			private void pushPendingText()
+			{
+				if (this._textValueEnd > this._textValueStart)
+				{
+					this._mainBuffer.Add(this._content.Slice(this._textValueStart, this._textValueEnd - this._textValueStart));
+				}
+
+				this._textValueStart = -1;
+				this._textValueEnd = -1;
+			}
+
+			private static bool isPercentCode(char code)
+			{
+				return code is 'D' or 'd' or 'P' or 'p' or 'C' or 'c' or '%';
+			}
 
 			/// <summary>
 			/// Flushes the text to the visitor with the current formatting.
 			/// </summary>
 			private void flushText(ReadOnlyMemory<char>? append = null)
 			{
-				if (this._textValueEnd > this._textValueStart)
-				{
-					this._mainBuffer.Add(this._content.Slice(this._textValueStart, this._textValueEnd - this._textValueStart));
-					this._textValueStart = -1;
-					this._textValueEnd = -1;
-				}
+				this.pushPendingText();
 
 				if (append != null) this._mainBuffer.Add(append.Value);
 
