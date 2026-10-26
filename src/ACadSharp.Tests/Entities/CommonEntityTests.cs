@@ -132,6 +132,12 @@ public abstract class CommonEntityTests<T>
 		Assert.Equal("ByLayer", entity.LineType.Name);
 	}
 
+	/// <remarks>
+	/// Virtual because one entity deliberately is not: a default
+	/// <see cref="ACadSharp.Entities.DimensionAngular2Line"/> has no angle, and a DWG stores a
+	/// dimension's measurement as a field of its own. That type states the exception in its own
+	/// override rather than leaving this case red.
+	/// </remarks>
 	[Theory]
 	[InlineData(CadFileFormat.DXF, ACadVersion.AC1014)]
 	[InlineData(CadFileFormat.DXF, ACadVersion.AC1032)]
