@@ -37,7 +37,11 @@ internal class DxfObjectsSectionWriter : DxfSectionWriterBase
 			this._writer.WriteTrueColor(420, color.Color);
 		}
 
-		this._writer.Write(430, $"{color.Name}${color.BookName}");
+		//BookName$ColorName is what Name already returns, and what AutoCAD writes here. Appending
+		//the book name again produced BookName$ColorName$BookName, which the Name setter splits
+		//back into BookName$BookName - so the swatch came back under a name no entity's group
+		//code 430 matches, and every color book reference in the file failed to resolve on reload.
+		this._writer.Write(430, color.Name);
 	}
 
 	protected void writeDictionary(CadDictionary dict)
