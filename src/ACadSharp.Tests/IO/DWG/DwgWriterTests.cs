@@ -2,7 +2,9 @@
 using ACadSharp.Exceptions;
 using ACadSharp.Header;
 using ACadSharp.IO;
+using ACadSharp.Objects;
 using ACadSharp.Tests.Common;
+using CSMath;
 using System.IO;
 using Xunit;
 using Xunit.Abstractions;
@@ -181,6 +183,60 @@ public class DwgWriterTests : IOTestsBase
 		using (var re = new DwgReader(path, this.onNotification))
 		{
 			CadDocument readed = re.Read();
+		}
+	}
+
+	/// <summary>
+	/// An entity can carry a book color and a true color at the same time: a dxf read takes the
+	/// true color from group code 420 and the book color from 430. The book color's rgb lives on
+	/// the AcDbColor object the entity points at, so the entity color must not also write it
+	/// inline - <c>ReadEnColor</c> does not consume it, and the displaced bits make the whole
+	/// entity unreadable.
+	/// </summary>
+	[Theory]
+	[MemberData(nameof(Versions))]
+	public void WriteEntityWithBookColorAndTrueColor(ACadVersion version)
+	{
+		//Book colors are an R2004+ feature.
+		if (!this.isSupportedVersion(version) || version < ACadVersion.AC1018)
+		{
+			return;
+		}
+
+		CadDocument doc = new CadDocument();
+		doc.Header.Version = version;
+
+		BookColor book = new BookColor("TEST BOOK$MY COLOR");
+		book.Color = new Color(226, 156, 0);
+		doc.Colors.Add(book);
+
+		Circle circle = new Circle();
+		circle.Center = new XYZ(10, 20, 0);
+		circle.Radius = 3;
+		circle.Color = Color.FromTrueColor(14848000);
+		circle.BookColor = book;
+		doc.Entities.Add(circle);
+
+		ulong handle = circle.Handle;
+
+		MemoryStream stream = new MemoryStream();
+
+		using (var wr = new DwgWriter(stream, doc))
+		{
+			wr.OnNotification += this.onNotification;
+			wr.Write();
+		}
+
+		stream = new MemoryStream(stream.ToArray());
+
+		using (var re = new DwgReader(stream, this.onNotification))
+		{
+			CadDocument readed = re.Read();
+
+			Circle result = readed.GetCadObject<Circle>(handle);
+			Assert.NotNull(result);
+			Assert.Equal(3, result.Radius);
+			Assert.NotNull(result.BookColor);
 		}
 	}
 
