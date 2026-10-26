@@ -128,7 +128,12 @@ namespace ACadSharp.IO.DWG
 
 			base.WriteBitShort((short)size);
 
-			if (color.IsTrueColor)
+			//Only when the RGB travels inline. A book color carries it on the AcDbColor object the
+			//entity hard-points at, so ReadEnColor takes the 0x4000 branch and consumes no BL here;
+			//an extra one displaces every field that follows, LineTypeScale first, and the entity
+			//cannot be read back at all. An entity can hold both: a dxf read takes a true color from
+			//group code 420 and the book color from 430.
+			if (color.IsTrueColor && !isBookColor)
 			{
 				byte[] arr = new byte[] { color.B, color.G, color.R, 0b11000010 };
 				uint rgb = LittleEndianConverter.Instance.ToUInt32(arr);
