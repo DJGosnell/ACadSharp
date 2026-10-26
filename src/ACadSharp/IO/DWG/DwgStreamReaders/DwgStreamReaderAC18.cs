@@ -110,8 +110,11 @@ namespace ACadSharp.IO.DWG
 			}
 			else
 			{
+				//A zero field is ByBlock with no flags: the 0x2000 bit is clear, so it carries no
+				//transparency BL, exactly like the branch above. Both cases must therefore give the
+				//same transparency, and Entity.Transparency's own default is ByLayer.
 				color = Color.ByBlock;
-				transparency = Transparency.Opaque;
+				transparency = Transparency.ByLayer;
 			}
 
 			return color;
