@@ -27,8 +27,16 @@ internal class DxfObjectsSectionWriter : DxfSectionWriterBase
 	{
 		this._writer.Write(DxfCode.Subclass, DxfSubclassMarker.DbColor);
 
-		this._writer.Write(62, color.Color.GetApproxIndex());
-		this._writer.WriteTrueColor(420, color.Color);
+		//A DBCOLOR is only obliged to carry its name, and one that names no color is written back
+		//exactly that way. Emitting 62 and 420 from the sentinel would write the index table's dummy
+		//row {0,0,0}, turning "this swatch names nothing" into "this swatch is black" - a claim the
+		//file never made and one no reader can undo.
+		if (color.NamesAColor)
+		{
+			this._writer.Write(62, color.Color.GetApproxIndex());
+			this._writer.WriteTrueColor(420, color.Color);
+		}
+
 		this._writer.Write(430, $"{color.Name}${color.BookName}");
 	}
 
