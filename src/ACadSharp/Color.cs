@@ -484,27 +484,46 @@ namespace ACadSharp
 		/// <summary>
 		/// Approximates color from a true color RGB.
 		/// </summary>
+		/// <remarks>
+		/// A nearest neighbour over the index table, under squared Euclidean distance in RGB.
+		/// Index 0 is excluded from the search: it is the table's dummy entry and is not a color a
+		/// drawing carries. Excluding it costs nothing, because index 250 is a genuine black and
+		/// answers black at distance 0. The table holds duplicate rows, so ties go to the lowest
+		/// index; a palette color fed back in therefore answers its own index, or the first index
+		/// carrying the same RGB.
+		/// </remarks>
+		/// <remarks>
+		/// The table is addressed by a <see cref="byte"/> — <see cref="GetIndexRGB"/> takes one and
+		/// this returns one — so a row past 255 is not an index any caller could resolve, and the
+		/// search is bounded there rather than at the table's length. Without that bound a longer
+		/// table could win at a row whose cast wraps onto a low index, and in particular onto 0,
+		/// which is the one index this search exists to exclude and is ByBlock at every write site.
+		/// </remarks>
 		/// <param name="r">Red</param>
 		/// <param name="g">Green</param>
 		/// <param name="b">Blue</param>
 		/// <returns>Approximate RGB color.</returns>
 		public static byte ApproxIndex(byte r, byte g, byte b)
 		{
-			var prevDist = -1;
-			for (var i = 0; i < _indexRgb.Length; i++)
-			{
-				var dist = (r - _indexRgb[i][0]) + (g - _indexRgb[i][1]) + (b - _indexRgb[i][2]);
-				if (dist == 0)
-					return (byte)i;
+			var closest = 1;
+			var closestDist = int.MaxValue;
+			var count = Math.Min(_indexRgb.Length, byte.MaxValue + 1);
 
-				if (dist < prevDist)
+			for (var i = 1; i < count; i++)
+			{
+				var dr = r - _indexRgb[i][0];
+				var dg = g - _indexRgb[i][1];
+				var db = b - _indexRgb[i][2];
+				var dist = (dr * dr) + (dg * dg) + (db * db);
+
+				if (dist < closestDist)
 				{
-					prevDist = dist;
-					return (byte)i;
+					closestDist = dist;
+					closest = i;
 				}
 			}
 
-			return 0;
+			return (byte)closest;
 		}
 
 		/// <summary>
