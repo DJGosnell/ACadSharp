@@ -166,6 +166,12 @@ namespace ACadSharp.Tests.Entities
 			new object[] { new TextData(@"\}", @"}") },
 			new object[] { new TextData(@"\\P", @"\P") },
 			new object[] { new TextData(@"\\~", @"\~") },
+			// An escaped backslash after text keeps its place in the text.
+			new object[] { new TextData(@"1\\2", @"1\2") },
+			new object[] { new TextData(@"ab\\cd", @"ab\cd") },
+			new object[] { new TextData(@"1\\P", @"1\P") },
+			new object[] { new TextData(@"1\\~2", @"1\~2") },
+			new object[] { new TextData(@"a\\b\\c", @"a\b\c") },
 		};
 
 		public static IEnumerable<object[]> ReadsTextData = new List<object[]>()
@@ -180,6 +186,10 @@ namespace ACadSharp.Tests.Entities
 			new object[] { new TextData(@"1\~2", "1\u00A02") },
 			new object[] { new TextData(@"%%", "%%") },
 			new object[] { new TextData(@"%", "%") },
+			// %% codes this reader does not interpret are literal text, not an exception.
+			new object[] { new TextData(@"%%u", "%%u") },
+			new object[] { new TextData(@"1%%o2", "1%%o2") },
+			new object[] { new TextData(@"%%127", "%%127") },
 			new object[] { new TextData(new[] { @"%%d", @"%%D" }, "°") },
 			new object[] { new TextData(new[] { @"1%%d", @"1%%D" }, "1°") },
 			new object[] { new TextData(new[] { @"1%%d2", @"1%%D2" }, "1°2") },
