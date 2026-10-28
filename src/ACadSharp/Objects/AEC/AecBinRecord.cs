@@ -36,5 +36,12 @@ public class AecBinRecord : NonGraphicalObject
 	/// <summary>
 	/// Optional name/identifier for this binary record.
 	/// </summary>
-	public string Name { get; set; }
+	/// <remarks>
+	/// The record's <see cref="NonGraphicalObject.Name"/>, so it is the same name whichever type the record is held as.
+	/// </remarks>
+	public override string Name
+	{
+		get => base.Name;
+		set => base.Name = value;
+	}
 }

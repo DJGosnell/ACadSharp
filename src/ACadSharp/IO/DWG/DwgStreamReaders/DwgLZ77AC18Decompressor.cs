@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CSUtilities.Extensions;
+using System;
 using System.IO;
 
 namespace ACadSharp.IO.DWG;
@@ -70,7 +71,7 @@ internal static class DwgLZ77AC18Decompressor
 				tempBuf = new byte[compressedBytes];
 			}
 			dst.Position = position - compOffset;
-			_ = dst.Read(tempBuf, 0, Math.Min(compressedBytes, compOffset));
+			dst.ReadExactly(tempBuf, 0, Math.Min(compressedBytes, compOffset));
 			dst.Position = position;
 			while (compressedBytes > 0)
 			{
@@ -105,7 +106,7 @@ internal static class DwgLZ77AC18Decompressor
 			tempBuf = new byte[count];
 		}
 
-		_ = src.Read(tempBuf, 0, count);
+		src.ReadExactly(tempBuf, 0, count);
 		dst.Write(tempBuf, 0, count);
 
 		return (byte)src.ReadByte();

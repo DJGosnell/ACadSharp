@@ -3,4 +3,13 @@
     <LangVersion>latest</LangVersion>
     <Configurations>Debug;Release;Test</Configurations>
   </PropertyGroup>
+  <PropertyGroup>
+    <!--
+      [fork] Third-party noise CadSharp5 does not own: upstream's unreachable code, unused locals,
+      doc-comment drift, obsolete-member use, nullable annotations outside a nullable context and
+      SYSLIB obsoletions. Measured in Release on every target framework (#414). Defect warnings
+      (CA2022, CS0108, CS0114, CA2200) are fixed in the code and never belong on this list.
+    -->
+    <NoWarn>$(NoWarn);CS0162;CS0168;CS0219;CS0419;CS0618;CS1572;CS1573;CS1574;CS1584;CS1587;CS1658;CS8632;SYSLIB0001;SYSLIB0051</NoWarn>
+  </PropertyGroup>
 </Project>
