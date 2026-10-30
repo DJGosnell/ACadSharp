@@ -6,6 +6,7 @@ using ACadSharp.Types.Units;
 using ACadSharp.XData;
 using CSMath;
 using CSUtilities;
+using CSUtilities.Converters;
 using CSUtilities.Extensions;
 using System;
 using System.Collections.Generic;
@@ -759,6 +760,14 @@ internal class DxfTablesSectionReader : DxfSectionReaderBase
 				return true;
 			case 348:
 				tmp.StyleHandle = this._reader.ValueAsHandle;
+				return true;
+			//The property map assigns a color from 62/420 only
+			case 63:
+				template.CadObject.AmbientColor = new Color(this._reader.ValueAsShort);
+				return true;
+			case 421:
+				byte[] rgb = LittleEndianConverter.Instance.GetBytes(this._reader.ValueAsInt);
+				template.CadObject.AmbientColor = new Color(rgb[2], rgb[1], rgb[0]);
 				return true;
 			default:
 				return this.tryAssignCurrentValue(template.CadObject, map);
