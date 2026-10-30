@@ -267,7 +267,7 @@ public class Layout : PlotSettings, IDxfClassDefined
 	}
 
 	/// <inheritdoc/>
-	public DxfClass GetDxfClass()
+	public override DxfClass GetDxfClass()
 	{
 		return new DxfClass
 		{
