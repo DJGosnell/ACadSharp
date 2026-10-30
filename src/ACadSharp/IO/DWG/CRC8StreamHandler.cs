@@ -38,7 +38,8 @@ namespace ACadSharp.IO.DWG
 		public override int Read(byte[] buffer, int offset, int count)
 		{
 			int nbytes = this._stream.Read(buffer, offset, count);
-			int length = offset + count;
+			//Only the bytes actually read are part of the check
+			int length = offset + nbytes;
 
 			for (int index = offset; index < length; ++index)
 				this.Seed = decode(this.Seed, buffer[index]);
