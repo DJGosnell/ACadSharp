@@ -23,7 +23,9 @@ namespace ACadSharp.IO.SVG
 		{
 		}
 
-		public void WriteLayout(Layout layout)
+		// Hides SvgXmlWriter.WriteLayout, which is not virtual: a call through SvgXmlWriter takes that one.
+		// Nothing instantiates this builder, so no caller can tell the two apart.
+		public new void WriteLayout(Layout layout)
 		{
 			this.Units = layout.PaperUnits.ToUnits();
 

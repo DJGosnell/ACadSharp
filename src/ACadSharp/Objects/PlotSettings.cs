@@ -260,7 +260,7 @@ public class PlotSettings : NonGraphicalObject, IDxfClassDefined
 	}
 
 	/// <inheritdoc/>
-	public DxfClass GetDxfClass()
+	public virtual DxfClass GetDxfClass()
 	{
 		return new DxfClass
 		{
