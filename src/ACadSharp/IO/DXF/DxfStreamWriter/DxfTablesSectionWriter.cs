@@ -382,9 +382,43 @@ namespace ACadSharp.IO.DXF
 
 			this._writer.Write(40, vport.ViewHeight);
 			this._writer.Write(41, vport.AspectRatio);
+			this._writer.Write(42, vport.LensLength, map);
+			this._writer.Write(43, vport.FrontClippingPlane, map);
+			this._writer.Write(44, vport.BackClippingPlane, map);
 
+			this._writer.Write(50, vport.SnapRotation, map);
+			this._writer.Write(51, vport.TwistAngle, map);
+
+			this._writer.Write(71, (short)vport.ViewMode, map);
+			this._writer.Write(72, vport.CircleZoomPercent, map);
+			this._writer.Write(74, (short)vport.UcsIconDisplay, map);
 			this._writer.Write(75, vport.SnapOn ? (short)1 : (short)0);
 			this._writer.Write(76, vport.ShowGrid ? (short)1 : (short)0);
+			this._writer.Write(77, vport.IsometricSnap ? (short)1 : (short)0);
+			this._writer.Write(78, vport.SnapIsoPair, map);
+
+			this._writer.Write(281, (byte)vport.RenderMode, map);
+
+			this._writer.Write(110, vport.Origin, map);
+			this._writer.Write(111, vport.XAxis, map);
+			this._writer.Write(112, vport.YAxis, map);
+			this._writer.Write(79, (short)vport.OrthographicType, map);
+			this._writer.Write(146, vport.Elevation, map);
+
+			this._writer.Write(60, (short)vport.GridFlags, map);
+			this._writer.Write(61, vport.MinorGridLinesPerMajorGridLine, map);
+
+			this._writer.Write(292, vport.UseDefaultLighting, map);
+			this._writer.Write(282, (byte)vport.DefaultLighting, map);
+			this._writer.Write(141, vport.Brightness, map);
+			this._writer.Write(142, vport.Contrast, map);
+
+			int ambient = vport.AmbientColor.IsTrueColor ? vport.AmbientColor.GetApproxIndex() : vport.AmbientColor.Index;
+			this._writer.Write(63, (short)ambient, map);
+			if (vport.AmbientColor.IsTrueColor)
+			{
+				this._writer.WriteTrueColor(421, vport.AmbientColor, map);
+			}
 		}
 	}
 }
