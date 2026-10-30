@@ -2568,7 +2568,7 @@ internal abstract class DxfSectionReaderBase
 		{
 			if (!this._builder.Configuration.Failsafe)
 			{
-				throw ex;
+				throw;
 			}
 			else
 			{
