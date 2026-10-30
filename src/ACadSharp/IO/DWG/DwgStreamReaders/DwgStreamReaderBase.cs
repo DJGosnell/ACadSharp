@@ -1,6 +1,7 @@
 ﻿using ACadSharp.Exceptions;
 using CSMath;
 using CSUtilities.Converters;
+using CSUtilities.Extensions;
 using CSUtilities.IO;
 using CSUtilities.Text;
 using System;
@@ -1013,8 +1014,7 @@ internal abstract class DwgStreamReaderBase : StreamIO, IDwgStreamReader
 		byte[] raw = new byte[length];
 		byte[] arr = new byte[8];
 
-		if (this.Stream.Read(raw, 0, length) < length)
-			throw new EndOfStreamException();
+		this.Stream.ReadExactly(raw, 0, length);
 
 		if (this.BitShift == 0)
 		{
@@ -1187,9 +1187,8 @@ internal abstract class DwgStreamReaderBase : StreamIO, IDwgStreamReader
 
 	private void applyShiftToArr(int length, byte[] arr)
 	{
-		//Empty Stream
-		if (this.Stream.Read(arr, 0, length) != length)
-			throw new EndOfStreamException();
+		//Throws EndOfStreamException on an empty stream
+		this.Stream.ReadExactly(arr, 0, length);
 
 		if ((uint)this.BitShift <= 0U)
 			return;
